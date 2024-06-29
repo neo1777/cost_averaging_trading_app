@@ -16,9 +16,6 @@ class Routes {
   static const String settings = '/settings';
 
   static Route<dynamic> generateRoute(RouteSettings setting) {
-    if (kDebugMode) {
-      print(setting.name);
-    }
     switch (setting.name) {
       case dashboard:
         return MaterialPageRoute(

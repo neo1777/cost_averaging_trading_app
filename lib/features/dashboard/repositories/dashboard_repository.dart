@@ -43,18 +43,12 @@ class DashboardRepository {
               price = await apiService.getCurrentPrice(symbol);
               break; // Se otteniamo il prezzo con successo, usciamo dal loop
             } catch (e) {
-              if (kDebugMode) {
-                print('Error getting price for $symbol: $e');
-              }
             }
           }
 
           if (price != null) {
             totalValue += entry.value * price;
           } else {
-            if (kDebugMode) {
-              print('Unable to get price for asset: ${entry.key}');
-            }
           }
         } else {
           totalValue += entry.value;

@@ -17,39 +17,22 @@ class RiskManagementService {
       CoreTrade proposedCoreTrade, double currentPortfolioValue) async {
     try {
       if (!await _isWithinVolatilityLimits(proposedCoreTrade)) {
-        if (kDebugMode) {
-          print('Trade non consentito: supera i limiti di volatilità');
-        }
         return false;
       }
 
       if (!await _isWithinMaxRebuyLimit(proposedCoreTrade)) {
-        if (kDebugMode) {
-          print('Trade non consentito: supera il limite massimo di riacquisti');
-        }
         return false;
       }
 
       if (!_isAboveStopLoss(proposedCoreTrade, currentPortfolioValue)) {
-        if (kDebugMode) {
-          print('Trade non consentito: viola lo stop loss');
-        }
         return false;
       }
 
       if (!_isWithinMaxPositionSize(proposedCoreTrade, currentPortfolioValue)) {
-        if (kDebugMode) {
-          print(
-              'Trade non consentito: supera la dimensione massima della posizione');
-        }
         return false;
       }
 
       if (!await _isWithinDailyExposureLimit(proposedCoreTrade)) {
-        if (kDebugMode) {
-          print(
-              'Trade non consentito: supera il limite di esposizione giornaliera');
-        }
         return false;
       }
 

@@ -11,14 +11,8 @@ class StrategyRepository {
   Future<StrategyParameters> getStrategyParameters() async {
     try {
       final data = await databaseService.query('strategy_parameters');
-      if (kDebugMode) {
-        print("Raw data from database: $data");
-      }
       if (data.isNotEmpty) {
         return StrategyParameters.fromJson(data.first);
-      }
-      if (kDebugMode) {
-        print("No data in database, returning default parameters");
       }
       // Return default parameters if none are saved
       return const StrategyParameters(
@@ -31,9 +25,6 @@ class StrategyRepository {
         maxInvestmentSize: 1000.0,
       );
     } catch (e) {
-      if (kDebugMode) {
-        print("Error in getStrategyParameters: $e");
-      }
       throw Exception('Failed to get strategy parameters: $e');
     }
   }
@@ -50,9 +41,8 @@ class StrategyRepository {
       }
       return StrategyStateStatus.inactive;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error getting strategy status: $e');
-      }
+      // Se la tabella non esiste, inserisci uno stato predefinito
+      await databaseService.insert('strategy_status', {'status': 'inactive'});
       return StrategyStateStatus.inactive;
     }
   }

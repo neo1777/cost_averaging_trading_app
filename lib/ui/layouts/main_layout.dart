@@ -81,10 +81,6 @@ class AppDrawer extends StatelessWidget {
         style: const TextStyle(fontSize: 18),
       ),
       onTap: () {
-        if (kDebugMode) {
-          print('route: $route');
-        }
-
         Navigator.pushReplacementNamed(context, route);
       },
     );

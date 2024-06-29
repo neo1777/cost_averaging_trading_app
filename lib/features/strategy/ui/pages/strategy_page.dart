@@ -26,9 +26,6 @@ class StrategyPage extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        if (kDebugMode) {
-          print("Current state: $state");
-        } // Debug print
         if (state is StrategyInitial) {
           context.read<StrategyBloc>().add(LoadStrategyData());
           return const Center(child: CircularProgressIndicator());

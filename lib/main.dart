@@ -18,6 +18,7 @@ void main() async {
     secretKey: dotenv.env['SECRET_KEY'] ?? '',
   );
   final databaseService = await DatabaseService.getInstance();
+
   final secureStorageService = SecureStorageService();
 
   runApp(

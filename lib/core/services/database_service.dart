@@ -32,6 +32,7 @@ class DatabaseService {
       }
 
       String path = join(await getDatabasesPath(), 'cost_averaging_trading.db');
+      //deleteDatabase(path);
       return await openDatabase(
         path,
         version: 2,
@@ -74,6 +75,13 @@ class DatabaseService {
           stopLossPercentage REAL
         )
       ''');
+
+      await db.execute('''
+      CREATE TABLE strategy_status(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status TEXT
+      )
+    ''');
     } catch (e, stackTrace) {
       ErrorHandler.logError('Failed to create database tables', e, stackTrace);
       throw Exception('Impossibile creare le tabelle del database');
@@ -115,14 +123,8 @@ class DatabaseService {
     try {
       Database db = await database;
       final result = await db.query(table);
-      if (kDebugMode) {
-        print("Query result for $table: $result");
-      } // Debug print
       return result;
     } catch (e) {
-      if (kDebugMode) {
-        print("Error querying $table: $e");
-      }
       throw Exception('Failed to query $table: $e');
     }
   }

@@ -4,11 +4,6 @@ import 'package:flutter/foundation.dart';
 
 class ErrorHandler {
   static void logError(String message, dynamic error, StackTrace stackTrace) {
-    if (kDebugMode) {
-      print('Error: $message');
-      print('Details: $error');
-      print('StackTrace: $stackTrace');
-    }
     // In un'applicazione reale, qui potresti inviare l'errore a un servizio di logging remoto
   }
 

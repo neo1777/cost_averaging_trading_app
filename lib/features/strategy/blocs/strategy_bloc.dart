@@ -28,25 +28,10 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
   ) async {
     emit(StrategyLoading());
     try {
-      if (kDebugMode) {
-        print("Loading strategy data...");
-      }
       final parameters = await _strategyRepository.getStrategyParameters();
-      if (kDebugMode) {
-        print("Parameters loaded: $parameters");
-      }
       final status = await _strategyRepository.getStrategyStatus();
-      if (kDebugMode) {
-        print("Status loaded: $status");
-      }
       final chartData = await _strategyRepository.getStrategyChartData();
-      if (kDebugMode) {
-        print("Chart data loaded: ${chartData.length} points");
-      }
       final settings = await _settingsRepository.getSettings();
-      if (kDebugMode) {
-        print("Settings loaded");
-      }
 
       final riskManagementSettings = RiskManagementSettings(
         maxLossPercentage: settings.maxLossPercentage,
@@ -57,9 +42,6 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
         maxRebuyCount: settings.maxRebuyCount,
       );
 
-      if (kDebugMode) {
-        print("Emitting StrategyLoaded state");
-      }
       emit(StrategyLoaded(
         parameters: parameters,
         status: status,
@@ -67,9 +49,6 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
         riskManagementSettings: riskManagementSettings,
       ));
     } catch (e) {
-      if (kDebugMode) {
-        print("Error loading strategy data: $e");
-      }
       emit(StrategyError('Failed to load strategy data: ${e.toString()}'));
     }
   }
