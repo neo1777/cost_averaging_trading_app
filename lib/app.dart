@@ -52,7 +52,7 @@ class App extends StatelessWidget {
         ),
         RepositoryProvider<StrategyRepository>(
           create: (context) => StrategyRepository(
-            apiService: apiService,
+            //apiService: apiService,
             databaseService: databaseService,
           ),
         ),
@@ -61,6 +61,9 @@ class App extends StatelessWidget {
         ),
         RepositoryProvider<SettingsRepository>(
           create: (context) => SettingsRepository(secureStorageService),
+        ),
+        RepositoryProvider<BacktestingService>(
+          create: (context) => BacktestingService(apiService),
         ),
       ],
       child: MultiBlocProvider(
@@ -75,7 +78,9 @@ class App extends StatelessWidget {
           ),
           BlocProvider<StrategyBloc>(
             create: (context) => StrategyBloc(
-              context.read<StrategyRepository>(),
+              StrategyRepository(
+                databaseService: context.read<DatabaseService>(),
+              ),
               context.read<SettingsRepository>(),
               context.read<BacktestingService>(),
             ),

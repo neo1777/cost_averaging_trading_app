@@ -1,26 +1,25 @@
-import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_event.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
 import 'package:cost_averaging_trading_app/features/strategy/repositories/strategy_repository.dart';
 import 'package:cost_averaging_trading_app/features/settings/repositories/settings_repository.dart';
+import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
 
 class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
   final StrategyRepository _strategyRepository;
   final SettingsRepository _settingsRepository;
   final BacktestingService _backtestingService;
 
-  StrategyBloc(this._strategyRepository, this._settingsRepository,
-      this._backtestingService)
-      : super(StrategyInitial()) {
+  StrategyBloc(
+    this._strategyRepository,
+    this._settingsRepository,
+    this._backtestingService,
+  ) : super(StrategyInitial()) {
     on<LoadStrategyData>(_onLoadStrategyData);
     on<UpdateStrategyParameters>(_onUpdateStrategyParameters);
-    on<StartStrategy>(_onStartStrategy);
-    on<StopStrategy>(_onStopStrategy);
+    on<UpdateStrategyStatus>(_onUpdateStrategyStatus);
     on<RunBacktestEvent>(_onRunBacktest);
-
-    add(LoadStrategyData());
   }
 
   Future<void> _onLoadStrategyData(
@@ -29,10 +28,25 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
   ) async {
     emit(StrategyLoading());
     try {
+      if (kDebugMode) {
+        print("Loading strategy data...");
+      }
       final parameters = await _strategyRepository.getStrategyParameters();
+      if (kDebugMode) {
+        print("Parameters loaded: $parameters");
+      }
       final status = await _strategyRepository.getStrategyStatus();
+      if (kDebugMode) {
+        print("Status loaded: $status");
+      }
       final chartData = await _strategyRepository.getStrategyChartData();
+      if (kDebugMode) {
+        print("Chart data loaded: ${chartData.length} points");
+      }
       final settings = await _settingsRepository.getSettings();
+      if (kDebugMode) {
+        print("Settings loaded");
+      }
 
       final riskManagementSettings = RiskManagementSettings(
         maxLossPercentage: settings.maxLossPercentage,
@@ -43,15 +57,20 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
         maxRebuyCount: settings.maxRebuyCount,
       );
 
+      if (kDebugMode) {
+        print("Emitting StrategyLoaded state");
+      }
       emit(StrategyLoaded(
         parameters: parameters,
         status: status,
         chartData: chartData,
         riskManagementSettings: riskManagementSettings,
       ));
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Error loading strategy data', e, stackTrace);
-      emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error loading strategy data: $e");
+      }
+      emit(StrategyError('Failed to load strategy data: ${e.toString()}'));
     }
   }
 
@@ -61,7 +80,6 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
   ) async {
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
-      emit(StrategyLoading());
       try {
         await _strategyRepository.updateStrategyParameters(event.parameters);
         emit(StrategyLoaded(
@@ -70,54 +88,30 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
           chartData: currentState.chartData,
           riskManagementSettings: currentState.riskManagementSettings,
         ));
-      } catch (e, stackTrace) {
-        ErrorHandler.logError(
-            'Error updating strategy parameters', e, stackTrace);
-        emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      } catch (e) {
+        emit(StrategyError(
+            'Failed to update strategy parameters: ${e.toString()}'));
       }
     }
   }
 
-  Future<void> _onStartStrategy(
-    StartStrategy event,
+  Future<void> _onUpdateStrategyStatus(
+    UpdateStrategyStatus event,
     Emitter<StrategyState> emit,
   ) async {
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
-      emit(StrategyLoading());
       try {
-        await _strategyRepository.startStrategy();
+        await _strategyRepository.saveStrategyStatus(event.status);
         emit(StrategyLoaded(
           parameters: currentState.parameters,
-          status: StrategyStateStatus.active,
+          status: event.status,
           chartData: currentState.chartData,
           riskManagementSettings: currentState.riskManagementSettings,
         ));
-      } catch (e, stackTrace) {
-        ErrorHandler.logError('Error starting strategy', e, stackTrace);
-        emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
-      }
-    }
-  }
-
-  Future<void> _onStopStrategy(
-    StopStrategy event,
-    Emitter<StrategyState> emit,
-  ) async {
-    if (state is StrategyLoaded) {
-      final currentState = state as StrategyLoaded;
-      emit(StrategyLoading());
-      try {
-        await _strategyRepository.stopStrategy();
-        emit(StrategyLoaded(
-          parameters: currentState.parameters,
-          status: StrategyStateStatus.inactive,
-          chartData: currentState.chartData,
-          riskManagementSettings: currentState.riskManagementSettings,
-        ));
-      } catch (e, stackTrace) {
-        ErrorHandler.logError('Error stopping strategy', e, stackTrace);
-        emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      } catch (e) {
+        emit(
+            StrategyError('Failed to update strategy status: ${e.toString()}'));
       }
     }
   }
@@ -130,7 +124,7 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
       final currentState = state as StrategyLoaded;
       emit(StrategyLoading());
       try {
-        final result = await _backtestingService.runBacktest(
+        final backtestResult = await _backtestingService.runBacktest(
           currentState.parameters.symbol,
           event.startDate,
           event.endDate,
@@ -141,11 +135,10 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
           status: currentState.status,
           chartData: currentState.chartData,
           riskManagementSettings: currentState.riskManagementSettings,
-          backtestResult: result,
+          backtestResult: backtestResult,
         ));
-      } catch (e, stackTrace) {
-        ErrorHandler.logError('Error running backtest', e, stackTrace);
-        emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      } catch (e) {
+        emit(StrategyError('Failed to run backtest: ${e.toString()}'));
       }
     }
   }

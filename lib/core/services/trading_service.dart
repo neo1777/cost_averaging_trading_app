@@ -242,7 +242,7 @@ class TradingService {
         return StrategyParameters.fromJson(data.first);
       } else {
         // Return default parameters if none are saved
-        return StrategyParameters(
+        return const StrategyParameters(
           symbol: 'BTCUSDT',
           investmentAmount: 100.0,
           intervalDays: 7,

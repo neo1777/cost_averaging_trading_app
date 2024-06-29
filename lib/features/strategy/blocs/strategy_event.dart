@@ -1,7 +1,6 @@
-// lib/features/strategy/blocs/strategy_event.dart
-
 import 'package:equatable/equatable.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
 
 abstract class StrategyEvent extends Equatable {
   const StrategyEvent();
@@ -21,9 +20,14 @@ class UpdateStrategyParameters extends StrategyEvent {
   List<Object> get props => [parameters];
 }
 
-class StartStrategy extends StrategyEvent {}
+class UpdateStrategyStatus extends StrategyEvent {
+  final StrategyStateStatus status;
 
-class StopStrategy extends StrategyEvent {}
+  const UpdateStrategyStatus(this.status);
+
+  @override
+  List<Object> get props => [status];
+}
 
 class RunBacktestEvent extends StrategyEvent {
   final DateTime startDate;

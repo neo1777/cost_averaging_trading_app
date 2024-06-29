@@ -11,13 +11,19 @@ class ApiService {
   ApiService({required this.apiKey, required this.secretKey});
 
   Future<dynamic> get(String endpoint,
-      {Map<String, dynamic>? queryParams}) async {
+      {Map<String, dynamic>? queryParams, bool requiresAuth = false}) async {
     try {
+      var params = queryParams ?? {};
+      if (requiresAuth) {
+        params['timestamp'] = DateTime.now().millisecondsSinceEpoch.toString();
+        params['signature'] = _generateSignature(params);
+      }
+
       final uri =
-          Uri.parse('$baseUrl$endpoint').replace(queryParameters: queryParams);
+          Uri.parse('$baseUrl$endpoint').replace(queryParameters: params);
       final response = await http.get(
         uri,
-        headers: _getHeaders(),
+        headers: _getHeaders(requiresAuth),
       );
       return _handleResponse(response);
     } catch (e, stackTrace) {
@@ -26,16 +32,18 @@ class ApiService {
     }
   }
 
-  Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
+  Future<dynamic> post(String endpoint, Map<String, dynamic> body,
+      {bool requiresAuth = true}) async {
     try {
-      final uri = Uri.parse('$baseUrl$endpoint');
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      body['timestamp'] = timestamp.toString();
-      body['signature'] = _generateSignature(body);
+      if (requiresAuth) {
+        body['timestamp'] = DateTime.now().millisecondsSinceEpoch.toString();
+        body['signature'] = _generateSignature(body);
+      }
 
+      final uri = Uri.parse('$baseUrl$endpoint');
       final response = await http.post(
         uri,
-        headers: _getHeaders(),
+        headers: _getHeaders(requiresAuth),
         body: body,
       );
       return _handleResponse(response);
@@ -45,11 +53,12 @@ class ApiService {
     }
   }
 
-  Map<String, String> _getHeaders() {
-    return {
-      'X-MBX-APIKEY': apiKey,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    };
+  Map<String, String> _getHeaders(bool requiresAuth) {
+    var headers = {'Content-Type': 'application/x-www-form-urlencoded'};
+    if (requiresAuth) {
+      headers['X-MBX-APIKEY'] = apiKey;
+    }
+    return headers;
   }
 
   String _generateSignature(Map<String, dynamic> params) {
@@ -63,17 +72,12 @@ class ApiService {
       return json.decode(response.body);
     } else {
       throw Exception(
-          'HTTP error ${response.statusCode}: ${response.reasonPhrase}');
+          'HTTP error ${response.statusCode}: ${response.reasonPhrase}\nBody: ${response.body}');
     }
   }
 
   Future<dynamic> getAccountInfo() async {
-    try {
-      return await get('/api/v3/account');
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to get account info', e, stackTrace);
-      rethrow;
-    }
+    return await get('/api/v3/account', requiresAuth: true);
   }
 
   Future<dynamic> createOrder({
@@ -84,20 +88,15 @@ class ApiService {
     String? price,
     String? stopPrice,
   }) async {
-    try {
-      final body = {
-        'symbol': symbol,
-        'side': side,
-        'type': type,
-        'quantity': quantity,
-        if (price != null) 'price': price,
-        if (stopPrice != null) 'stopPrice': stopPrice,
-      };
-      return await post('/api/v3/order', body);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to create order', e, stackTrace);
-      rethrow;
-    }
+    final body = {
+      'symbol': symbol,
+      'side': side,
+      'type': type,
+      'quantity': quantity,
+      if (price != null) 'price': price,
+      if (stopPrice != null) 'stopPrice': stopPrice,
+    };
+    return await post('/api/v3/order', body);
   }
 
   Future<dynamic> cancelOrder({
@@ -114,16 +113,18 @@ class ApiService {
   }
 
   Future<dynamic> getOpenOrders({String? symbol}) async {
-    final queryParams = symbol != null ? {'symbol': symbol} : null;
-    return await get('/api/v3/openOrders', queryParams: queryParams);
+    return await get('/api/v3/openOrders',
+        queryParams: symbol != null ? {'symbol': symbol} : null,
+        requiresAuth: true);
   }
 
   Future<dynamic> getAllOrders({required String symbol}) async {
-    return await get('/api/v3/allOrders', queryParams: {'symbol': symbol});
+    return await get('/api/v3/allOrders',
+        queryParams: {'symbol': symbol}, requiresAuth: true);
   }
 
   Future<dynamic> getExchangeInfo() async {
-    return await get('/api/v3/exchangeInfo');
+    return await get('/api/v3/exchangeInfo', requiresAuth: false);
   }
 
   Future<List<Map<String, dynamic>>> getKlines({
@@ -133,40 +134,79 @@ class ApiService {
     int? startTime,
     int? endTime,
   }) async {
-    try {
-      final queryParams = {
-        'symbol': symbol,
-        'interval': interval,
-        if (limit != null) 'limit': limit.toString(),
-        if (startTime != null) 'startTime': startTime.toString(),
-        if (endTime != null) 'endTime': endTime.toString(),
-      };
-      final response = await get('/api/v3/klines', queryParams: queryParams);
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to get klines', e, stackTrace);
-      rethrow;
-    }
+    final queryParams = {
+      'symbol': symbol,
+      'interval': interval,
+      if (limit != null) 'limit': limit.toString(),
+      if (startTime != null) 'startTime': startTime.toString(),
+      if (endTime != null) 'endTime': endTime.toString(),
+    };
+    final response = await get('/api/v3/klines',
+        queryParams: queryParams, requiresAuth: false);
+    return List<Map<String, dynamic>>.from(response);
   }
 
   Future<Map<String, dynamic>> get24hrTickerPriceChange(String symbol) async {
-    try {
-      return await get('/api/v3/ticker/24hr', queryParams: {'symbol': symbol});
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-          'Failed to get 24hr ticker price change', e, stackTrace);
-      rethrow;
-    }
+    return await get('/api/v3/ticker/24hr',
+        queryParams: {'symbol': symbol}, requiresAuth: false);
   }
 
   Future<double> getCurrentPrice(String symbol) async {
-    try {
-      final response =
-          await get('/api/v3/ticker/price', queryParams: {'symbol': symbol});
-      return double.parse(response['price']);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to get current price', e, stackTrace);
-      rethrow;
+    if (symbol.isEmpty) {
+      throw ArgumentError('Symbol cannot be empty');
     }
+    final response = await get('/api/v3/ticker/price',
+        queryParams: {'symbol': symbol}, requiresAuth: false);
+    if (response is Map<String, dynamic> && response.containsKey('price')) {
+      return double.parse(response['price']);
+    } else {
+      throw Exception('Unexpected response format for price');
+    }
+  }
+
+  Future<List<String>> getValidTradingSymbols() async {
+    final response = await get('/api/v3/exchangeInfo', requiresAuth: false);
+    final symbols = (response['symbols'] as List<dynamic>)
+        .map((symbol) => symbol['symbol'] as String)
+        .toList();
+    return symbols;
+  }
+
+  Future<dynamic> getMyTrades({required String symbol}) async {
+    return await get('/api/v3/myTrades',
+        queryParams: {'symbol': symbol}, requiresAuth: true);
+  }
+
+  Future<dynamic> getAccountTradeList({required String symbol}) async {
+    return await get('/api/v3/myTrades',
+        queryParams: {'symbol': symbol}, requiresAuth: true);
+  }
+
+  Future<dynamic> getDepositHistory() async {
+    return await get('/sapi/v1/capital/deposit/hisrec', requiresAuth: true);
+  }
+
+  Future<dynamic> getWithdrawHistory() async {
+    return await get('/sapi/v1/capital/withdraw/history', requiresAuth: true);
+  }
+
+  Future<dynamic> getDepositAddress({required String coin}) async {
+    return await get('/sapi/v1/capital/deposit/address',
+        queryParams: {'coin': coin}, requiresAuth: true);
+  }
+
+  Future<dynamic> withdraw({
+    required String coin,
+    required String address,
+    required String amount,
+    String? network,
+  }) async {
+    final body = {
+      'coin': coin,
+      'address': address,
+      'amount': amount,
+      if (network != null) 'network': network,
+    };
+    return await post('/sapi/v1/capital/withdraw/apply', body);
   }
 }

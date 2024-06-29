@@ -1,5 +1,5 @@
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
@@ -114,10 +114,16 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> query(String table) async {
     try {
       Database db = await database;
-      return await db.query(table);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to query $table', e, stackTrace);
-      throw Exception('Impossibile interrogare la tabella $table');
+      final result = await db.query(table);
+      if (kDebugMode) {
+        print("Query result for $table: $result");
+      } // Debug print
+      return result;
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error querying $table: $e");
+      }
+      throw Exception('Failed to query $table: $e');
     }
   }
 
@@ -177,20 +183,19 @@ class DatabaseService {
     }
   }
 
-    Future<CoreTrade?> getLastTrade(String symbol) async {
-  Database db = await database;
-  List<Map<String, dynamic>> result = await db.query(
-    'trades',
-    where: 'symbol = ?',
-    whereArgs: [symbol],
-    orderBy: 'timestamp DESC',
-    limit: 1,
-  );
-  
-  if (result.isNotEmpty) {
-    return CoreTrade.fromJson(result.first);
-  }
-  return null;
-}
+  Future<CoreTrade?> getLastTrade(String symbol) async {
+    Database db = await database;
+    List<Map<String, dynamic>> result = await db.query(
+      'trades',
+      where: 'symbol = ?',
+      whereArgs: [symbol],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
 
+    if (result.isNotEmpty) {
+      return CoreTrade.fromJson(result.first);
+    }
+    return null;
+  }
 }

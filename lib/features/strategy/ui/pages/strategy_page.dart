@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
@@ -25,14 +26,20 @@ class StrategyPage extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        if (state is StrategyInitial || state is StrategyLoading) {
-          return const LoadingIndicator(message: 'Loading strategy...');
+        if (kDebugMode) {
+          print("Current state: $state");
+        } // Debug print
+        if (state is StrategyInitial) {
+          context.read<StrategyBloc>().add(LoadStrategyData());
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is StrategyLoading) {
+          return const Center(child: CircularProgressIndicator());
         } else if (state is StrategyLoaded) {
           return _buildLoadedContent(context, state);
         } else if (state is StrategyError) {
-          return ErrorMessage(message: state.message);
+          return Center(child: Text(state.message));
         }
-        return const ErrorMessage(message: 'Unknown state');
+        return const Center(child: Text('Unexpected state'));
       },
     );
   }

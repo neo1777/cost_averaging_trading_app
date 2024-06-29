@@ -2,6 +2,7 @@ import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+import 'package:flutter/foundation.dart';
 
 class DashboardRepository {
   final ApiService apiService;
@@ -20,11 +21,41 @@ class DashboardRepository {
             ),
       );
 
+      final validSymbols = await apiService.getValidTradingSymbols();
+
       double totalValue = 0;
       for (var entry in assets.entries) {
         if (entry.key != 'USDT') {
-          final price = await apiService.getCurrentPrice('${entry.key}USDT');
-          totalValue += entry.value * price;
+          final symbolVariations = [
+            '${entry.key}USDT',
+            entry.key.endsWith('W')
+                ? '${entry.key.substring(0, entry.key.length - 1)}USDT'
+                : null,
+            'USDT${entry.key}',
+          ]
+              .whereType<String>()
+              .where((symbol) => validSymbols.contains(symbol))
+              .toList();
+
+          double? price;
+          for (var symbol in symbolVariations) {
+            try {
+              price = await apiService.getCurrentPrice(symbol);
+              break; // Se otteniamo il prezzo con successo, usciamo dal loop
+            } catch (e) {
+              if (kDebugMode) {
+                print('Error getting price for $symbol: $e');
+              }
+            }
+          }
+
+          if (price != null) {
+            totalValue += entry.value * price;
+          } else {
+            if (kDebugMode) {
+              print('Unable to get price for asset: ${entry.key}');
+            }
+          }
         } else {
           totalValue += entry.value;
         }

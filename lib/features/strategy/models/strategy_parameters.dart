@@ -1,15 +1,15 @@
-// lib/features/strategy/models/strategy_parameters.dart
+import 'package:equatable/equatable.dart';
 
-class StrategyParameters {
+class StrategyParameters extends Equatable {
   final String symbol;
   final double investmentAmount;
   final int intervalDays;
   final double targetProfitPercentage;
   final double stopLossPercentage;
-  final int purchaseFrequency; // Nuovo parametro
-  final double maxInvestmentSize; // Nuovo parametro
+  final int purchaseFrequency;
+  final double maxInvestmentSize;
 
-  StrategyParameters({
+  const StrategyParameters({
     required this.symbol,
     required this.investmentAmount,
     required this.intervalDays,
@@ -19,15 +19,47 @@ class StrategyParameters {
     required this.maxInvestmentSize,
   });
 
+  @override
+  List<Object> get props => [
+        symbol,
+        investmentAmount,
+        intervalDays,
+        targetProfitPercentage,
+        stopLossPercentage,
+        purchaseFrequency,
+        maxInvestmentSize,
+      ];
+
+  StrategyParameters copyWith({
+    String? symbol,
+    double? investmentAmount,
+    int? intervalDays,
+    double? targetProfitPercentage,
+    double? stopLossPercentage,
+    int? purchaseFrequency,
+    double? maxInvestmentSize,
+  }) {
+    return StrategyParameters(
+      symbol: symbol ?? this.symbol,
+      investmentAmount: investmentAmount ?? this.investmentAmount,
+      intervalDays: intervalDays ?? this.intervalDays,
+      targetProfitPercentage:
+          targetProfitPercentage ?? this.targetProfitPercentage,
+      stopLossPercentage: stopLossPercentage ?? this.stopLossPercentage,
+      purchaseFrequency: purchaseFrequency ?? this.purchaseFrequency,
+      maxInvestmentSize: maxInvestmentSize ?? this.maxInvestmentSize,
+    );
+  }
+
   factory StrategyParameters.fromJson(Map<String, dynamic> json) {
     return StrategyParameters(
       symbol: json['symbol'],
-      investmentAmount: json['investmentAmount'].toDouble(),
+      investmentAmount: json['investmentAmount'],
       intervalDays: json['intervalDays'],
-      targetProfitPercentage: json['targetProfitPercentage'].toDouble(),
-      stopLossPercentage: json['stopLossPercentage'].toDouble(),
+      targetProfitPercentage: json['targetProfitPercentage'],
+      stopLossPercentage: json['stopLossPercentage'],
       purchaseFrequency: json['purchaseFrequency'],
-      maxInvestmentSize: json['maxInvestmentSize'].toDouble(),
+      maxInvestmentSize: json['maxInvestmentSize'],
     );
   }
 

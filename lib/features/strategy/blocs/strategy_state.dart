@@ -1,5 +1,3 @@
-// lib/features/strategy/blocs/strategy_state.dart
-
 import 'package:equatable/equatable.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
 import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
@@ -38,8 +36,17 @@ class StrategyLoaded extends StrategyState {
         status,
         chartData,
         riskManagementSettings,
-        if (backtestResult != null) backtestResult!,
+        if (backtestResult != null) backtestResult!
       ];
+}
+
+class StrategyError extends StrategyState {
+  final String message;
+
+  const StrategyError(this.message);
+
+  @override
+  List<Object> get props => [message];
 }
 
 class RiskManagementSettings {
@@ -58,13 +65,4 @@ class RiskManagementSettings {
     required this.maxAllowedVolatility,
     required this.maxRebuyCount,
   });
-}
-
-class StrategyError extends StrategyState {
-  final String message;
-
-  const StrategyError(this.message);
-
-  @override
-  List<Object> get props => [message];
 }
