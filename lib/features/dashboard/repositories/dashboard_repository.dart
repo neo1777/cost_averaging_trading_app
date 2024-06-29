@@ -1,8 +1,8 @@
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
 import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
-import 'package:flutter/foundation.dart';
 
 class DashboardRepository {
   final ApiService apiService;
@@ -42,53 +42,108 @@ class DashboardRepository {
             try {
               price = await apiService.getCurrentPrice(symbol);
               break; // Se otteniamo il prezzo con successo, usciamo dal loop
-            } catch (e) {
+            } catch (e, stackTrace) {
+              ErrorHandler.logError(
+                  'Error getting price for $symbol', e, stackTrace);
             }
           }
 
           if (price != null) {
             totalValue += entry.value * price;
           } else {
+            ErrorHandler.logError(
+                'Unable to get price for asset', null, StackTrace.current);
           }
         } else {
           totalValue += entry.value;
         }
       }
 
-      return Portfolio(
+      final portfolio = Portfolio(
         id: accountInfo['accountType'],
         assets: assets,
         totalValue: totalValue,
       );
-    } catch (e) {
-      // Fallback to local data if API call fails
+
+      // Salva il portfolio nel database locale
+      try {
+        await databaseService.insert('portfolio', portfolio.toJson());
+      } catch (e, stackTrace) {
+        ErrorHandler.logError(
+            'Error saving portfolio to local database', e, stackTrace);
+      }
+
+      return portfolio;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error fetching portfolio from API', e, stackTrace);
+      return _getLocalPortfolio();
+    }
+  }
+
+  Future<Portfolio> _getLocalPortfolio() async {
+    try {
       final localData = await databaseService.query('portfolio');
       if (localData.isNotEmpty) {
         return Portfolio.fromJson(localData.first);
       }
-      throw Exception('Failed to get portfolio data');
+      throw Exception('No local portfolio data available');
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+          'Error fetching portfolio from local database', e, stackTrace);
+      // Se non c'è nessun dato locale disponibile, ritorna un portfolio vuoto
+      return const Portfolio(id: 'local', assets: {}, totalValue: 0);
     }
   }
 
-  Future<List<CoreTrade>> getRecentTrades() async {
+  Future<List<CoreTrade>> getRecentTrades(
+      {required int page, required int perPage}) async {
     try {
-      final orders = await apiService.getAllOrders(symbol: 'BTCUSDT');
-      return orders
-          .map<CoreTrade>((order) => CoreTrade(
-                id: order['orderId'].toString(),
-                symbol: order['symbol'],
-                amount: double.parse(order['executedQty']),
-                price: double.parse(order['price']),
-                timestamp: DateTime.fromMillisecondsSinceEpoch(order['time']),
-                type: order['side'] == 'BUY'
-                    ? CoreTradeType.buy
-                    : CoreTradeType.sell,
-              ))
+      final trades = await apiService.getMyTrades(
+          symbol: 'BTCUSDT', limit: perPage, startTime: null);
+
+      final coreTrades = trades
+          .map((trade) {
+            try {
+              return CoreTrade.fromJson(trade);
+            } catch (e, stackTrace) {
+              ErrorHandler.logError('Error parsing trade', e, stackTrace);
+              return null;
+            }
+          })
+          .whereType<CoreTrade>()
           .toList();
-    } catch (e) {
-      // Fallback to local data if API call fails
-      final localData = await databaseService.query('trades');
+
+      // Salva i trade nel database locale
+      for (var trade in coreTrades) {
+        try {
+          await databaseService.insert('trades', trade.toJson());
+        } catch (e, stackTrace) {
+          ErrorHandler.logError(
+              'Error inserting trade into database', e, stackTrace);
+        }
+      }
+
+      return coreTrades;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error fetching trades from API', e, stackTrace);
+      return _getLocalTrades(page, perPage);
+    }
+  }
+
+  Future<List<CoreTrade>> _getLocalTrades(int page, int perPage) async {
+    try {
+      final localData = await databaseService.query(
+        'trades',
+        orderBy: 'timestamp DESC',
+        limit: perPage,
+        offset: (page - 1) * perPage,
+      );
+
       return localData.map((trade) => CoreTrade.fromJson(trade)).toList();
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+          'Error fetching trades from local database', e, stackTrace);
+      return []; // Ritorna una lista vuota se non è possibile recuperare i dati locali
     }
   }
 

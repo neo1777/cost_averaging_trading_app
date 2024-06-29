@@ -84,7 +84,19 @@ class DashboardPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             CustomCard(
-              child: RecentTradesWidget(trades: state.recentTrades),
+              child: RecentTradesWidget(
+                trades: state.recentTrades,
+                currentPage: state.currentPage,
+                tradesPerPage: state.tradesPerPage,
+                onLoadMore: () {
+                  context.read<DashboardBloc>().add(LoadMoreTrades());
+                },
+                onChangeTradesPerPage: (newValue) {
+                  context
+                      .read<DashboardBloc>()
+                      .add(ChangeTradesPerPage(newValue));
+                },
+              ),
             ),
           ],
         ),
@@ -115,7 +127,19 @@ class DashboardPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             CustomCard(
-              child: RecentTradesWidget(trades: state.recentTrades),
+              child: RecentTradesWidget(
+                trades: state.recentTrades,
+                currentPage: state.currentPage,
+                tradesPerPage: state.tradesPerPage,
+                onLoadMore: () {
+                  context.read<DashboardBloc>().add(LoadMoreTrades());
+                },
+                onChangeTradesPerPage: (newValue) {
+                  context
+                      .read<DashboardBloc>()
+                      .add(ChangeTradesPerPage(newValue));
+                },
+              ),
             ),
           ],
         ),

@@ -1,6 +1,5 @@
 // lib/core/error/error_handler.dart
 
-import 'package:flutter/foundation.dart';
 
 class ErrorHandler {
   static void logError(String message, dynamic error, StackTrace stackTrace) {

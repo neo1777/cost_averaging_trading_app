@@ -1,15 +1,15 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_bloc.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_event.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
-import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_parameters_form.dart';
-import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_chart.dart';
-import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_status.dart';
-import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/risk_info_card.dart';
 import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/backtest_results.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/risk_info_card.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_chart.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_parameters_form.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_status.dart';
 import 'package:cost_averaging_trading_app/ui/widgets/responsive_text.dart';
 
 class StrategyPage extends StatelessWidget {

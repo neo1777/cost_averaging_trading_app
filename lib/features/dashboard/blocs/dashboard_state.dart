@@ -17,15 +17,36 @@ class DashboardLoaded extends DashboardState {
   final Portfolio portfolio;
   final List<CoreTrade> recentTrades;
   final List<Map<String, dynamic>> performanceData;
+  final int currentPage;
+  final int tradesPerPage;
 
   const DashboardLoaded({
     required this.portfolio,
     required this.recentTrades,
     required this.performanceData,
+    required this.currentPage,
+    required this.tradesPerPage,
   });
 
+  DashboardLoaded copyWith({
+    Portfolio? portfolio,
+    List<CoreTrade>? recentTrades,
+    List<Map<String, dynamic>>? performanceData,
+    int? currentPage,
+    int? tradesPerPage,
+  }) {
+    return DashboardLoaded(
+      portfolio: portfolio ?? this.portfolio,
+      recentTrades: recentTrades ?? this.recentTrades,
+      performanceData: performanceData ?? this.performanceData,
+      currentPage: currentPage ?? this.currentPage,
+      tradesPerPage: tradesPerPage ?? this.tradesPerPage,
+    );
+  }
+
   @override
-  List<Object> get props => [portfolio, recentTrades, performanceData];
+  List<Object> get props =>
+      [portfolio, recentTrades, performanceData, currentPage, tradesPerPage];
 }
 
 class DashboardError extends DashboardState {

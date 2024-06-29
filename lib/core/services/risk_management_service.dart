@@ -4,7 +4,6 @@ import 'package:cost_averaging_trading_app/features/settings/models/settings_mod
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
 import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
-import 'package:flutter/foundation.dart';
 
 class RiskManagementService {
   final SettingsModel settings;

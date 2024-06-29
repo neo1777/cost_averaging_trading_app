@@ -1,7 +1,6 @@
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
-import 'package:flutter/foundation.dart';
 
 class StrategyRepository {
   final DatabaseService databaseService;

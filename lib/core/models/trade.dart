@@ -42,15 +42,16 @@ class CoreTrade extends Equatable {
     );
   }
 
-  factory CoreTrade.fromJson(Map<String, dynamic> json) {
+factory CoreTrade.fromJson(Map<String, dynamic> json) {
     return CoreTrade(
-      id: json['id'],
-      symbol: json['symbol'],
-      amount: json['amount'],
-      price: json['price'],
-      timestamp: DateTime.parse(json['timestamp']),
-      type: CoreTradeType.values
-          .firstWhere((e) => e.toString() == 'CoreTradeType.${json['type']}'),
+      id: json['id']?.toString() ?? '',
+      symbol: json['symbol'] ?? '',
+      amount: double.tryParse(json['qty']?.toString() ?? '0') ?? 0.0,
+      price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+      timestamp: json['time'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(json['time'] as int)
+          : DateTime.now(),
+      type: json['isBuyer'] == true ? CoreTradeType.buy : CoreTradeType.sell,
     );
   }
 
@@ -60,8 +61,8 @@ class CoreTrade extends Equatable {
       'symbol': symbol,
       'amount': amount,
       'price': price,
-      'timestamp': timestamp.toIso8601String(),
-      'type': type.toString().split('.').last,
+      'timestamp': timestamp.millisecondsSinceEpoch,
+      'type': type == CoreTradeType.buy ? 'buy' : 'sell',
     };
   }
 }

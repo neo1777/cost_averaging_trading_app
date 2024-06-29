@@ -1,11 +1,11 @@
 // lib/routes.dart
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import 'package:cost_averaging_trading_app/features/dashboard/ui/pages/dashboard_page.dart';
 import 'package:cost_averaging_trading_app/features/portfolio/ui/pages/portfolio_page.dart';
+import 'package:cost_averaging_trading_app/features/settings/ui/pages/settings_page.dart';
 import 'package:cost_averaging_trading_app/features/strategy/ui/pages/strategy_page.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/ui/pages/trade_history_page.dart';
-import 'package:cost_averaging_trading_app/features/settings/ui/pages/settings_page.dart';
 import 'package:cost_averaging_trading_app/ui/layouts/main_layout.dart'; // Aggiungi questa importazione
 
 class Routes {

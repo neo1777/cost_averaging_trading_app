@@ -172,9 +172,24 @@ class ApiService {
     return symbols;
   }
 
-  Future<dynamic> getMyTrades({required String symbol}) async {
-    return await get('/api/v3/myTrades',
-        queryParams: {'symbol': symbol}, requiresAuth: true);
+  Future<List<Map<String, dynamic>>> getMyTrades(
+      {required String symbol, int? limit, int? startTime}) async {
+    try {
+      final params = {
+        'symbol': symbol,
+        if (limit != null) 'limit': limit.toString(),
+        if (startTime != null) 'startTime': startTime.toString(),
+      };
+      final response = await get('/api/v3/myTrades',
+          queryParams: params, requiresAuth: true);
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
+      } else {
+        return [];
+      }
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<dynamic> getAccountTradeList({required String symbol}) async {

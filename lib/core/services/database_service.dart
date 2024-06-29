@@ -1,5 +1,5 @@
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
@@ -47,15 +47,16 @@ class DatabaseService {
 
   Future<void> _createDb(Database db, int version) async {
     try {
-      await db.execute('''
-        CREATE TABLE trades(
-          id TEXT PRIMARY KEY,
-          symbol TEXT,
-          amount REAL,
-          price REAL,
-          timestamp INTEGER
-        )
-      ''');
+        await db.execute('''
+      CREATE TABLE trades(
+        id TEXT PRIMARY KEY,
+        symbol TEXT,
+        amount REAL,
+        price REAL,
+        timestamp INTEGER,
+        type TEXT
+      )
+    ''');
 
       await db.execute('''
         CREATE TABLE portfolio(
@@ -113,16 +114,37 @@ class DatabaseService {
       Database db = await database;
       return await db.insert(table, data,
           conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to insert data into $table', e, stackTrace);
-      throw Exception('Impossibile inserire i dati nella tabella $table');
+    } catch (e) {
+      return -1;
     }
   }
 
-  Future<List<Map<String, dynamic>>> query(String table) async {
+  Future<List<Map<String, dynamic>>> query(
+    String table, {
+    bool? distinct,
+    List<String>? columns,
+    String? where,
+    List<Object?>? whereArgs,
+    String? groupBy,
+    String? having,
+    String? orderBy,
+    int? limit,
+    int? offset,
+  }) async {
     try {
       Database db = await database;
-      final result = await db.query(table);
+      final result = await db.query(
+        table,
+        distinct: distinct,
+        columns: columns,
+        where: where,
+        whereArgs: whereArgs,
+        groupBy: groupBy,
+        having: having,
+        orderBy: orderBy,
+        limit: limit,
+        offset: offset,
+      );
       return result;
     } catch (e) {
       throw Exception('Failed to query $table: $e');

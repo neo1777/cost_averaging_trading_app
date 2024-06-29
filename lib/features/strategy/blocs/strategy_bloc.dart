@@ -1,10 +1,10 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
+import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+import 'package:cost_averaging_trading_app/features/settings/repositories/settings_repository.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_event.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
 import 'package:cost_averaging_trading_app/features/strategy/repositories/strategy_repository.dart';
-import 'package:cost_averaging_trading_app/features/settings/repositories/settings_repository.dart';
-import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
 
 class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
   final StrategyRepository _strategyRepository;
