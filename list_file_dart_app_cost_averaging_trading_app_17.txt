@@ -1,0 +1,132 @@
+./lib
+├── core
+│   ├── animations
+│   │   └── custom_animations.dart
+│   ├── domain
+│   │   ├── entities
+│   │   │   ├── portfolio_entity.dart
+│   │   │   └── trade_entity.dart
+│   │   └── enums
+│   │       └── trading_enums.dart
+│   ├── dtos
+│   │   ├── portfolio_dto.dart
+│   │   └── trade_dto.dart
+│   ├── error
+│   │   └── error_handler.dart
+│   ├── mappers
+│   │   ├── portfolio_mapper.dart
+│   │   └── trade_mapper.dart
+│   ├── models
+│   │   ├── portfolio.dart
+│   │   └── trade.dart
+│   ├── repositories
+│   │   ├── portfolio_repository.dart
+│   │   ├── portfolio_repository_impl.dart
+│   │   ├── trading_repository.dart
+│   │   └── trading_repository_impl.dart
+│   ├── services
+│   │   ├── api_service.dart
+│   │   ├── backtesting_service.dart
+│   │   ├── database_service.dart
+│   │   ├── risk_management_service.dart
+│   │   ├── secure_storage_service.dart
+│   │   └── trading_service.dart
+│   ├── theme
+│   │   └── app_theme.dart
+│   └── widgets
+│       └── shared_widgets.dart
+├── features
+│   ├── dashboard
+│   │   ├── blocs
+│   │   │   ├── dashboard_bloc.dart
+│   │   │   ├── dashboard_event.dart
+│   │   │   └── dashboard_state.dart
+│   │   ├── models
+│   │   │   └── dashboard_model.dart
+│   │   ├── repositories
+│   │   │   └── dashboard_repository.dart
+│   │   └── ui
+│   │       ├── pages
+│   │       │   └── dashboard_page.dart
+│   │       └── widgets
+│   │           ├── performance_chart.dart
+│   │           ├── portfolio_overview.dart
+│   │           └── recent_trades_widget.dart
+│   ├── portfolio
+│   │   ├── blocs
+│   │   │   ├── portfolio_bloc.dart
+│   │   │   ├── portfolio_event.dart
+│   │   │   └── portfolio_state.dart
+│   │   ├── models
+│   │   │   └── portfolio_model.dart
+│   │   ├── repositories
+│   │   │   └── portfolio_repository.dart
+│   │   └── ui
+│   │       ├── pages
+│   │       │   └── portfolio_page.dart
+│   │       └── widgets
+│   │           ├── asset_list.dart
+│   │           ├── portfolio_chart.dart
+│   │           └── portfolio_summary.dart
+│   ├── settings
+│   │   ├── blocs
+│   │   │   ├── settings_bloc.dart
+│   │   │   ├── settings_event.dart
+│   │   │   └── settings_state.dart
+│   │   ├── models
+│   │   │   └── settings_model.dart
+│   │   ├── repositories
+│   │   │   └── settings_repository.dart
+│   │   └── ui
+│   │       ├── pages
+│   │       │   └── settings_page.dart
+│   │       └── widgets
+│   │           ├── api_settings.dart
+│   │           ├── backtesting_settings.dart
+│   │           ├── demo_mode_toggle.dart
+│   │           └── risk_management.dart
+│   ├── strategy
+│   │   ├── blocs
+│   │   │   ├── strategy_bloc.dart
+│   │   │   ├── strategy_event.dart
+│   │   │   └── strategy_state.dart
+│   │   ├── models
+│   │   │   ├── strategy_model.dart
+│   │   │   └── strategy_parameters.dart
+│   │   ├── repositories
+│   │   │   └── strategy_repository.dart
+│   │   └── ui
+│   │       ├── pages
+│   │       │   └── strategy_page.dart
+│   │       └── widgets
+│   │           ├── backtest_results.dart
+│   │           ├── risk_info_card.dart
+│   │           ├── strategy_chart.dart
+│   │           ├── strategy_parameters_form.dart
+│   │           └── strategy_status.dart
+│   └── trade_history
+│       ├── blocs
+│       │   ├── trade_history_bloc.dart
+│       │   ├── trade_history_event.dart
+│       │   └── trade_history_state.dart
+│       ├── models
+│       │   └── trade_history_model.dart
+│       ├── repositories
+│       │   └── trade_history_repository.dart
+│       └── ui
+│           ├── pages
+│           │   └── trade_history_page.dart
+│           └── widgets
+│               ├── filters.dart
+│               ├── statistics.dart
+│               ├── trade_filters.dart
+│               ├── trade_list.dart
+│               └── trade_stats.dart
+├── ui
+│   ├── layouts
+│   │   └── main_layout.dart
+│   └── widgets
+│       └── responsive_text.dart
+├── app.dart
+├── main.dart
+└── routes.dart

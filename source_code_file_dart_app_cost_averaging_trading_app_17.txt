@@ -1,0 +1,5534 @@
+./lib/main.dart:
+```
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:cost_averaging_trading_app/app.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+import 'package:cost_averaging_trading_app/core/services/secure_storage_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Carica le variabili d'ambiente
+  await dotenv.load(fileName: ".env");
+
+  final apiService = ApiService(
+    apiKey: dotenv.env['API_KEY'] ?? '',
+    secretKey: dotenv.env['SECRET_KEY'] ?? '',
+  );
+  final databaseService = await DatabaseService.getInstance();
+  final secureStorageService = SecureStorageService();
+
+  runApp(App(
+    apiService: apiService,
+    databaseService: databaseService,
+    secureStorageService: secureStorageService,
+  ));
+}
+```
+
+./lib/routes.dart:
+```
+// lib/routes.dart
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/ui/pages/dashboard_page.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/ui/pages/portfolio_page.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/pages/strategy_page.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/ui/pages/trade_history_page.dart';
+import 'package:cost_averaging_trading_app/features/settings/ui/pages/settings_page.dart';
+import 'package:cost_averaging_trading_app/ui/layouts/main_layout.dart'; // Aggiungi questa importazione
+
+class Routes {
+  static const String dashboard = '/';
+  static const String portfolio = '/portfolio';
+  static const String strategy = '/strategy';
+  static const String tradeHistory = '/trade-history';
+  static const String settings = '/settings';
+
+  static Route<dynamic> generateRoute(RouteSettings setting) {
+    if (kDebugMode) {
+      print(setting.name);
+    }
+    switch (setting.name) {
+      case dashboard:
+        return MaterialPageRoute(
+            builder: (_) => const MainLayout(child: DashboardPage()));
+      case portfolio:
+        return MaterialPageRoute(
+            builder: (_) => const MainLayout(child: PortfolioPage()));
+      case strategy:
+        return MaterialPageRoute(
+            builder: (_) => const MainLayout(child: StrategyPage()));
+      case tradeHistory:
+        return MaterialPageRoute(
+            builder: (_) => const MainLayout(child: TradeHistoryPage()));
+      case settings:
+        return MaterialPageRoute(
+            builder: (_) => const MainLayout(child: SettingsPage()));
+      default:
+        return MaterialPageRoute(
+          builder: (_) => Scaffold(
+            body: Center(
+              child: Text('No route defined for ${setting.name}'),
+            ),
+          ),
+        );
+    }
+  }
+}
+
+```
+
+./lib/app.dart:
+```
+// lib/app.dart
+import 'package:cost_averaging_trading_app/core/theme/app_theme.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+import 'package:cost_averaging_trading_app/core/services/secure_storage_service.dart';
+import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/repositories/dashboard_repository.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/ui/pages/dashboard_page.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_bloc.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/repositories/portfolio_repository.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_bloc.dart';
+import 'package:cost_averaging_trading_app/features/settings/repositories/settings_repository.dart';
+import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_bloc.dart';
+import 'package:cost_averaging_trading_app/features/strategy/repositories/strategy_repository.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_bloc.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/repositories/trade_history_repository.dart';
+import 'package:cost_averaging_trading_app/routes.dart';
+import 'package:cost_averaging_trading_app/ui/layouts/main_layout.dart';
+
+class App extends StatelessWidget {
+  final ApiService apiService;
+  final DatabaseService databaseService;
+  final SecureStorageService secureStorageService;
+
+  const App({
+    super.key,
+    required this.apiService,
+    required this.databaseService,
+    required this.secureStorageService,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<DashboardRepository>(
+          create: (context) => DashboardRepository(
+              apiService: apiService, databaseService: databaseService),
+        ),
+        RepositoryProvider<PortfolioRepository>(
+          create: (context) => PortfolioRepository(
+              apiService: apiService, databaseService: databaseService),
+        ),
+        RepositoryProvider<StrategyRepository>(
+          create: (context) => StrategyRepository(
+              apiService: apiService, databaseService: databaseService),
+        ),
+        RepositoryProvider<TradeHistoryRepository>(
+          create: (context) => TradeHistoryRepository(),
+        ),
+        RepositoryProvider<SettingsRepository>(
+          create: (context) => SettingsRepository(secureStorageService),
+        ),
+        RepositoryProvider<BacktestingService>(
+          create: (context) => BacktestingService(apiService),
+        ),
+      ],
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<DashboardBloc>(
+            create: (context) =>
+                DashboardBloc(context.read<DashboardRepository>()),
+          ),
+          BlocProvider<PortfolioBloc>(
+            create: (context) =>
+                PortfolioBloc(context.read<PortfolioRepository>()),
+          ),
+          BlocProvider<StrategyBloc>(
+            create: (context) => StrategyBloc(
+              context.read<StrategyRepository>(),
+              context.read<SettingsRepository>(),
+              context.read<BacktestingService>(),
+            ),
+          ),
+          BlocProvider<TradeHistoryBloc>(
+            create: (context) =>
+                TradeHistoryBloc(context.read<TradeHistoryRepository>()),
+          ),
+          BlocProvider<SettingsBloc>(
+            create: (context) =>
+                SettingsBloc(context.read<SettingsRepository>()),
+          ),
+        ],
+        child: MaterialApp(
+          title: 'Cost Averaging Trading App',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeMode.system, // Usa il tema del sistema
+          home: const MainLayout(child: DashboardPage()),
+          onGenerateRoute: Routes.generateRoute,
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/ui/widgets/responsive_text.dart:
+```
+import 'package:auto_size_text/auto_size_text.dart';
+import 'package:flutter/material.dart';
+
+class ResponsiveText extends StatelessWidget {
+  final String text;
+  final TextStyle? style;
+  final int maxLines;
+  final TextAlign textAlign;
+
+  const ResponsiveText(
+    this.text, {
+    super.key,
+    this.style,
+    this.maxLines = 1,
+    this.textAlign = TextAlign.start,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AutoSizeText(
+      text,
+      style: style,
+      maxLines: maxLines,
+      textAlign: textAlign,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+```
+
+./lib/ui/layouts/main_layout.dart:
+```
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_bloc.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_state.dart';
+import 'package:cost_averaging_trading_app/routes.dart';
+import 'package:cost_averaging_trading_app/ui/widgets/responsive_text.dart';
+
+class MainLayout extends StatelessWidget {
+  final Widget child;
+
+  const MainLayout({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDesktop = MediaQuery.of(context).size.width >= 600;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const ResponsiveText(
+          'Cost Averaging Trading App',
+          style: TextStyle(fontSize: 20),
+        ),
+        automaticallyImplyLeading: !isDesktop,
+        actions: [
+          BlocBuilder<SettingsBloc, SettingsState>(
+            builder: (context, state) {
+              if (state is SettingsLoaded && state.isDemoMode) {
+                return const Chip(
+                  label: Text('Demo Mode'),
+                  backgroundColor: Colors.orange,
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
+      ),
+      drawer: isDesktop ? null : const AppDrawer(),
+      body: SafeArea(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isDesktop) const AppDrawer(),
+            Expanded(child: child),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AppDrawer extends StatelessWidget {
+  const AppDrawer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      child: ListView(
+        children: [
+          const DrawerHeader(
+            child: ResponsiveText(
+              'Menu',
+              style: TextStyle(fontSize: 24),
+            ),
+          ),
+          _buildMenuItem(context, 'Dashboard', Routes.dashboard),
+          _buildMenuItem(context, 'Strategy', Routes.strategy),
+          _buildMenuItem(context, 'Portfolio', Routes.portfolio),
+          _buildMenuItem(context, 'Trade History', Routes.tradeHistory),
+          _buildMenuItem(context, 'Settings', Routes.settings),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(BuildContext context, String title, String route) {
+    return ListTile(
+      title: ResponsiveText(
+        title,
+        style: const TextStyle(fontSize: 18),
+      ),
+      onTap: () {
+        if (kDebugMode) {
+          print('route: $route');
+        }
+
+        Navigator.pushReplacementNamed(context, route);
+      },
+    );
+  }
+}
+
+```
+
+./lib/features/trade_history/ui/widgets/trade_stats.dart:
+```
+// lib/features/trade_history/ui/widgets/trade_stats.dart
+
+import 'package:flutter/material.dart';
+
+class TradeStats extends StatelessWidget {
+  final Map<String, dynamic> stats;
+
+  const TradeStats({super.key, required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Trade Statistics',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Text('Total Trades: ${stats['totalTrades']}'),
+            Text('Buy Trades: ${stats['buyTrades']}'),
+            Text('Sell Trades: ${stats['sellTrades']}'),
+            Text('Total Volume: \$${stats['totalVolume'].toStringAsFixed(2)}'),
+            Text(
+                'Total Profit/Loss: \$${stats['totalProfit'].toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            Text('Asset Volumes:',
+                style: Theme.of(context).textTheme.titleMedium),
+            ...(stats['assetVolumes'] as Map<String, double>).entries.map(
+                  (entry) =>
+                      Text('${entry.key}: \$${entry.value.toStringAsFixed(2)}'),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/trade_history/ui/widgets/statistics.dart:
+```
+import 'package:flutter/material.dart';
+
+class Statistics extends StatelessWidget {
+  final Map<String, dynamic> statistics;
+
+  const Statistics({super.key, required this.statistics});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Trade Statistics', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Text('Total Trades: ${statistics['totalTrades']}'),
+            Text('Buy Trades: ${statistics['buyTrades']}'),
+            Text('Sell Trades: ${statistics['sellTrades']}'),
+            Text('Total Volume: \$${statistics['totalVolume'].toStringAsFixed(2)}'),
+            Text('Total Profit/Loss: \$${statistics['totalProfit'].toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            Text('Asset Volumes:', style: Theme.of(context).textTheme.titleMedium),
+            ...(statistics['assetVolumes'] as Map<String, double>).entries.map(
+              (entry) => Text('${entry.key}: \$${entry.value.toStringAsFixed(2)}'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+./lib/features/trade_history/ui/widgets/filters.dart:
+```
+import 'package:flutter/material.dart';
+
+class Filters extends StatefulWidget {
+  final Function(DateTime?, DateTime?, String?) onFilterApplied;
+
+  const Filters({super.key, required this.onFilterApplied});
+
+  @override
+  FiltersState createState() => FiltersState();
+}
+
+class FiltersState extends State<Filters> {
+  DateTime? _startDate;
+  DateTime? _endDate;
+  String? _selectedAssetPair;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Filters', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    decoration: const InputDecoration(labelText: 'Start Date'),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) {
+                        setState(() => _startDate = date);
+                      }
+                    },
+                    controller: TextEditingController(
+                      text: _startDate != null
+                          ? '${_startDate!.toLocal()}'.split(' ')[0]
+                          : '',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    decoration: const InputDecoration(labelText: 'End Date'),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) {
+                        setState(() => _endDate = date);
+                      }
+                    },
+                    controller: TextEditingController(
+                      text: _endDate != null
+                          ? '${_endDate!.toLocal()}'.split(' ')[0]
+                          : '',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(labelText: 'Asset Pair'),
+              value: _selectedAssetPair,
+              items: ['BTC/USDT', 'ETH/USDT', 'XRP/USDT']
+                  .map((pair) =>
+                      DropdownMenuItem(value: pair, child: Text(pair)))
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedAssetPair = value),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => widget.onFilterApplied(
+                  _startDate, _endDate, _selectedAssetPair),
+              child: const Text('Apply Filters'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/trade_history/ui/widgets/trade_filters.dart:
+```
+// lib/features/trade_history/ui/widgets/trade_filters.dart
+
+import 'package:flutter/material.dart';
+
+class TradeFilters extends StatefulWidget {
+  final Function(DateTime?, DateTime?, String?) onFilterApplied;
+
+  const TradeFilters({super.key, required this.onFilterApplied});
+
+  @override
+  TradeFiltersState createState() => TradeFiltersState();
+}
+
+class TradeFiltersState extends State<TradeFilters> {
+  DateTime? _startDate;
+  DateTime? _endDate;
+  String? _selectedAssetPair;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Filters', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    decoration: const InputDecoration(labelText: 'Start Date'),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) {
+                        setState(() => _startDate = date);
+                      }
+                    },
+                    controller: TextEditingController(
+                      text: _startDate != null
+                          ? '${_startDate!.toLocal()}'.split(' ')[0]
+                          : '',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    decoration: const InputDecoration(labelText: 'End Date'),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) {
+                        setState(() => _endDate = date);
+                      }
+                    },
+                    controller: TextEditingController(
+                      text: _endDate != null
+                          ? '${_endDate!.toLocal()}'.split(' ')[0]
+                          : '',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(labelText: 'Asset Pair'),
+              value: _selectedAssetPair,
+              items: ['BTC/USDT', 'ETH/USDT', 'XRP/USDT']
+                  .map((pair) =>
+                      DropdownMenuItem(value: pair, child: Text(pair)))
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedAssetPair = value),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => widget.onFilterApplied(
+                  _startDate, _endDate, _selectedAssetPair),
+              child: const Text('Apply Filters'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/trade_history/ui/widgets/trade_list.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+class TradeList extends StatelessWidget {
+  final List<CoreTrade> trades;
+
+  const TradeList({super.key, required this.trades});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: trades.length,
+      itemBuilder: (context, index) {
+        final trade = trades[index];
+        return Card(
+          child: ListTile(
+            title: Text('${trade.type.name.toUpperCase()} ${trade.amount} ${trade.symbol}'),
+            subtitle: Text('Price: ${trade.price} | ${DateFormat.yMd().add_Hms().format(trade.timestamp)}'),
+            trailing: Text(
+              '${trade.type.name == 'buy' ? '-' : '+'}${(trade.amount * trade.price).toStringAsFixed(2)}',
+              style: TextStyle(
+                color: trade.type.name == 'buy' ? Colors.red : Colors.green,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+./lib/features/trade_history/ui/pages/trade_history_page.dart:
+```
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_bloc.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_state.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_event.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_list.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_filters.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_stats.dart';
+
+class TradeHistoryPage extends StatelessWidget {
+  const TradeHistoryPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TradeHistoryBloc, TradeHistoryState>(
+      builder: (context, state) {
+        if (state is TradeHistoryInitial || state is TradeHistoryLoading) {
+          return const LoadingIndicator(message: 'Loading trade history...');
+        } else if (state is TradeHistoryLoaded) {
+          return _buildLoadedContent(context, state);
+        } else if (state is TradeHistoryError) {
+          return ErrorMessage(message: state.message);
+        }
+        return const ErrorMessage(message: 'Unknown state');
+      },
+    );
+  }
+
+  Widget _buildLoadedContent(BuildContext context, TradeHistoryLoaded state) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CustomCard(
+              child: TradeFilters(
+                onFilterApplied: (startDate, endDate, assetPair) {
+                  context.read<TradeHistoryBloc>().add(
+                        FilterTradeHistory(
+                          startDate: startDate,
+                          endDate: endDate,
+                          assetPair: assetPair,
+                        ),
+                      );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: TradeStats(stats: state.statistics),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: TradeList(trades: state.trades),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/trade_history/blocs/trade_history_state.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+
+abstract class TradeHistoryState {}
+
+class TradeHistoryInitial extends TradeHistoryState {}
+
+class TradeHistoryLoading extends TradeHistoryState {}
+
+class TradeHistoryLoaded extends TradeHistoryState {
+  final List<CoreTrade> trades;
+  final Map<String, dynamic> statistics;
+
+  TradeHistoryLoaded({required this.trades, required this.statistics});
+}
+
+class TradeHistoryError extends TradeHistoryState {
+  final String message;
+
+  TradeHistoryError(this.message);
+}
+```
+
+./lib/features/trade_history/blocs/trade_history_event.dart:
+```
+abstract class TradeHistoryEvent {}
+
+class LoadTradeHistory extends TradeHistoryEvent {}
+
+class FilterTradeHistory extends TradeHistoryEvent {
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final String? assetPair;
+
+  FilterTradeHistory({this.startDate, this.endDate, this.assetPair});
+}
+```
+
+./lib/features/trade_history/blocs/trade_history_bloc.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_event.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_state.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/repositories/trade_history_repository.dart';
+
+class TradeHistoryBloc extends Bloc<TradeHistoryEvent, TradeHistoryState> {
+  final TradeHistoryRepository _repository;
+
+  TradeHistoryBloc(this._repository) : super(TradeHistoryInitial()) {
+    on<LoadTradeHistory>(_onLoadTradeHistory);
+    on<FilterTradeHistory>(_onFilterTradeHistory);
+
+    // Aggiungiamo questa riga per caricare i dati all'inizializzazione
+    add(LoadTradeHistory());
+  }
+
+  Future<void> _onLoadTradeHistory(
+    LoadTradeHistory event,
+    Emitter<TradeHistoryState> emit,
+  ) async {
+    emit(TradeHistoryLoading());
+    try {
+      final trades = await _repository.getTradeHistory();
+      final statistics = _calculateStatistics(trades);
+      emit(TradeHistoryLoaded(trades: trades, statistics: statistics));
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error loading trade history', e, stackTrace);
+      emit(TradeHistoryError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+    }
+  }
+
+  Future<void> _onFilterTradeHistory(
+    FilterTradeHistory event,
+    Emitter<TradeHistoryState> emit,
+  ) async {
+    emit(TradeHistoryLoading());
+    try {
+      final trades = await _repository.getFilteredTradeHistory(
+        startDate: event.startDate,
+        endDate: event.endDate,
+        assetPair: event.assetPair,
+      );
+      final statistics = _calculateStatistics(trades);
+      emit(TradeHistoryLoaded(trades: trades, statistics: statistics));
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error filtering trade history', e, stackTrace);
+      emit(TradeHistoryError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+    }
+  }
+
+  Map<String, dynamic> _calculateStatistics(List<CoreTrade> trades) {
+    final totalTrades = trades.length;
+    final buyTrades =
+        trades.where((trade) => trade.type.name.toLowerCase() == 'buy').length;
+    final sellTrades = totalTrades - buyTrades;
+
+    double totalVolume = 0;
+    double totalProfit = 0;
+    Map<String, double> assetVolumes = {};
+
+    for (var trade in trades) {
+      final tradeVolume = trade.amount * trade.price;
+      totalVolume += tradeVolume;
+
+      if (trade.type.name.toLowerCase() == 'sell') {
+        totalProfit += tradeVolume;
+      } else {
+        totalProfit -= tradeVolume;
+      }
+
+      assetVolumes[trade.symbol] =
+          (assetVolumes[trade.symbol] ?? 0) + tradeVolume;
+    }
+
+    return {
+      'totalTrades': totalTrades,
+      'buyTrades': buyTrades,
+      'sellTrades': sellTrades,
+      'totalVolume': totalVolume,
+      'totalProfit': totalProfit,
+      'assetVolumes': assetVolumes,
+    };
+  }
+}
+
+```
+
+./lib/features/trade_history/repositories/trade_history_repository.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+
+class TradeHistoryRepository {
+  Future<List<CoreTrade>> getTradeHistory() async {
+    // Simulazione di una chiamata API
+    await Future.delayed(const Duration(seconds: 1));
+    
+    // Dati di esempio
+    return [
+      CoreTrade(
+        id: '1',
+        symbol: 'BTC/USDT',
+        amount: 0.1,
+        price: 50000,
+        timestamp: DateTime.now().subtract(const Duration(days: 1)),
+        type: CoreTradeType.sell,
+      ),
+      CoreTrade(
+        id: '2',
+        symbol: 'ETH/USDT',
+        amount: 1.5,
+        price: 3000,
+        timestamp: DateTime.now().subtract(const Duration(hours: 12)),
+        type: CoreTradeType.sell,
+      ),
+      // Aggiungi altri trade di esempio qui
+    ];
+  }
+
+  Future<List<CoreTrade>> getFilteredTradeHistory({
+    DateTime? startDate,
+    DateTime? endDate,
+    String? assetPair,
+  }) async {
+    // Simulazione di una chiamata API con filtri
+    await Future.delayed(const Duration(seconds: 1));
+    
+    List<CoreTrade> allTrades = await getTradeHistory();
+    
+    return allTrades.where((trade) {
+      bool dateCondition = true;
+      if (startDate != null) {
+        dateCondition = dateCondition && trade.timestamp.isAfter(startDate);
+      }
+      if (endDate != null) {
+        dateCondition = dateCondition && trade.timestamp.isBefore(endDate);
+      }
+      bool assetCondition = assetPair == null || trade.symbol == assetPair;
+      
+      return dateCondition && assetCondition;
+    }).toList();
+  }
+}
+```
+
+./lib/features/trade_history/models/trade_history_model.dart:
+```
+class TradeHistoryTrade {
+  final String id;
+  final String assetPair;
+  final double amount;
+  final double price;
+  final DateTime timestamp;
+  final String type; // 'buy' o 'sell'
+
+  TradeHistoryTrade({
+    required this.id,
+    required this.assetPair,
+    required this.amount,
+    required this.price,
+    required this.timestamp,
+    required this.type,
+  });
+
+  factory TradeHistoryTrade.fromJson(Map<String, dynamic> json) {
+    return TradeHistoryTrade(
+      id: json['id'],
+      assetPair: json['assetPair'],
+      amount: json['amount'].toDouble(),
+      price: json['price'].toDouble(),
+      timestamp: DateTime.parse(json['timestamp']),
+      type: json['type'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'assetPair': assetPair,
+      'amount': amount,
+      'price': price,
+      'timestamp': timestamp.toIso8601String(),
+      'type': type,
+    };
+  }
+}
+
+class TradeHistoryModel {
+  final List<TradeHistoryTrade> trades;
+
+  TradeHistoryModel({required this.trades});
+
+  factory TradeHistoryModel.fromJson(Map<String, dynamic> json) {
+    var tradeList = json['trades'] as List;
+    List<TradeHistoryTrade> trades =
+        tradeList.map((i) => TradeHistoryTrade.fromJson(i)).toList();
+    return TradeHistoryModel(trades: trades);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'trades': trades.map((trade) => trade.toJson()).toList(),
+    };
+  }
+}
+
+```
+
+./lib/features/strategy/ui/widgets/risk_info_card.dart:
+```
+import 'package:flutter/material.dart';
+
+class RiskInfoCard extends StatelessWidget {
+  final double maxLossPercentage;
+  final int maxConcurrentTrades;
+  final double maxPositionSizePercentage;
+  final double dailyExposureLimit;
+  final double maxAllowedVolatility;
+  final int maxRebuyCount;
+
+  const RiskInfoCard({
+    super.key,
+    required this.maxLossPercentage,
+    required this.maxConcurrentTrades,
+    required this.maxPositionSizePercentage,
+    required this.dailyExposureLimit,
+    required this.maxAllowedVolatility,
+    required this.maxRebuyCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Risk Management Settings',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            _buildInfoRow('Max Loss Percentage',
+                '${maxLossPercentage.toStringAsFixed(2)}%'),
+            _buildInfoRow(
+                'Max Concurrent Trades', maxConcurrentTrades.toString()),
+            _buildInfoRow('Max Position Size',
+                '${maxPositionSizePercentage.toStringAsFixed(2)}%'),
+            _buildInfoRow('Daily Exposure Limit',
+                '\$${dailyExposureLimit.toStringAsFixed(2)}'),
+            _buildInfoRow('Max Allowed Volatility',
+                '${(maxAllowedVolatility * 100).toStringAsFixed(2)}%'),
+            _buildInfoRow('Max Rebuy Count', maxRebuyCount.toString()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(value),
+        ],
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/strategy/ui/widgets/strategy_status.dart:
+```
+// lib/features/strategy/ui/widgets/strategy_status.dart
+
+import 'package:flutter/material.dart';
+
+enum StrategyStatus { inactive, active, paused }
+
+class StrategyStatusWidget extends StatelessWidget {
+  final StrategyStatus status;
+
+  const StrategyStatusWidget({super.key, required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Strategy Status:'),
+            _buildStatusChip(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip() {
+    Color color;
+    String label;
+
+    switch (status) {
+      case StrategyStatus.inactive:
+        color = Colors.grey;
+        label = 'Inactive';
+        break;
+      case StrategyStatus.active:
+        color = Colors.green;
+        label = 'Active';
+        break;
+      case StrategyStatus.paused:
+        color = Colors.orange;
+        label = 'Paused';
+        break;
+    }
+
+    return Chip(
+      label: Text(label),
+      backgroundColor: color,
+    );
+  }
+}
+```
+
+./lib/features/strategy/ui/widgets/strategy_chart.dart:
+```
+// lib/features/strategy/ui/widgets/strategy_chart.dart
+
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+
+class StrategyChart extends StatelessWidget {
+  final List<Map<String, dynamic>> chartData;
+
+  const StrategyChart({super.key, required this.chartData});
+
+  @override
+  Widget build(BuildContext context) {
+    if (chartData.isEmpty) {
+      return const Center(child: Text('No chart data available'));
+    }
+    final minY = chartData
+        .map((d) => (d['value'] as num).toDouble())
+        .reduce((a, b) => a < b ? a : b);
+    final maxY = chartData
+        .map((d) => (d['value'] as num).toDouble())
+        .reduce((a, b) => a > b ? a : b);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SizedBox(
+          height: 300,
+          child: LineChart(
+            LineChartData(
+              gridData: const FlGridData(show: false),
+              titlesData: const FlTitlesData(show: false),
+              borderData: FlBorderData(show: true),
+              minX: 0,
+              maxX: chartData.length.toDouble() - 1,
+              minY: minY,
+              maxY: maxY,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: chartData.asMap().entries.map((entry) {
+                    return FlSpot(
+                      entry.key.toDouble(),
+                      (entry.value['value'] as num).toDouble(),
+                    );
+                  }).toList(),
+                  isCurved: true,
+                  color: Theme.of(context).primaryColor,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(
+                      show: true,
+                      color: Theme.of(context).primaryColor.withOpacity(0.3)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/strategy/ui/widgets/backtest_results.dart:
+```
+
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+
+class BacktestResults extends StatelessWidget {
+  final BacktestResult? backtestResult;
+  final Function(DateTime startDate, DateTime endDate) onRunBacktest;
+
+  const BacktestResults({
+    super.key,
+    this.backtestResult,
+    required this.onRunBacktest,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Backtest Results',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        _buildBacktestControls(context),
+        if (backtestResult != null) ...[
+          const SizedBox(height: 16),
+          _buildBacktestSummary(context),
+          const SizedBox(height: 16),
+          _buildTradesList(context),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBacktestControls(BuildContext context) {
+    return Row(
+      children: [
+        ElevatedButton(
+          onPressed: () {
+            // Implementa la logica per selezionare le date
+            final now = DateTime.now();
+            final oneYearAgo = now.subtract(const Duration(days: 365));
+            onRunBacktest(oneYearAgo, now);
+          },
+          child: const Text('Run Backtest'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBacktestSummary(BuildContext context) {
+    final performance = backtestResult!.performance;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Total Profit: \$${performance.totalProfit.toStringAsFixed(2)}'),
+        Text('Win Rate: ${(performance.winRate * 100).toStringAsFixed(2)}%'),
+        Text('Max Drawdown: ${(performance.maxDrawdown * 100).toStringAsFixed(2)}%'),
+        Text('Sharpe Ratio: ${performance.sharpeRatio.toStringAsFixed(2)}'),
+      ],
+    );
+  }
+
+  Widget _buildTradesList(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Trades',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            itemCount: backtestResult!.trades.length,
+            itemBuilder: (context, index) {
+              final trade = backtestResult!.trades[index];
+              return ListTile(
+                title: Text('${trade.type == CoreTradeType.buy ? 'Buy' : 'Sell'} ${trade.amount} ${trade.symbol}'),
+                subtitle: Text('Price: \$${trade.price.toStringAsFixed(2)}'),
+                trailing: Text(trade.timestamp.toString().split(' ')[0]),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+./lib/features/strategy/ui/widgets/strategy_parameters_form.dart:
+```
+// lib/features/strategy/ui/widgets/strategy_parameters_form.dart
+
+import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+
+class StrategyParametersForm extends StatefulWidget {
+  final StrategyParameters? initialParameters;
+  final Function(StrategyParameters) onParametersChanged;
+
+  const StrategyParametersForm({
+    super.key,
+    this.initialParameters,
+    required this.onParametersChanged,
+  });
+
+  @override
+  StrategyParametersFormState createState() => StrategyParametersFormState();
+}
+
+class StrategyParametersFormState extends State<StrategyParametersForm> {
+  late TextEditingController _symbolController;
+  late TextEditingController _investmentAmountController;
+  late TextEditingController _intervalDaysController;
+  late TextEditingController _targetProfitPercentageController;
+  late TextEditingController _stopLossPercentageController;
+  late TextEditingController _purchaseFrequencyController;
+  late TextEditingController _maxInvestmentSizeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _symbolController =
+        TextEditingController(text: widget.initialParameters?.symbol ?? '');
+    _investmentAmountController = TextEditingController(
+        text: widget.initialParameters?.investmentAmount.toString() ?? '');
+    _intervalDaysController = TextEditingController(
+        text: widget.initialParameters?.intervalDays.toString() ?? '');
+    _targetProfitPercentageController = TextEditingController(
+        text:
+            widget.initialParameters?.targetProfitPercentage.toString() ?? '');
+    _stopLossPercentageController = TextEditingController(
+        text: widget.initialParameters?.stopLossPercentage.toString() ?? '');
+    _purchaseFrequencyController = TextEditingController(
+        text: widget.initialParameters?.purchaseFrequency.toString() ?? '');
+    _maxInvestmentSizeController = TextEditingController(
+        text: widget.initialParameters?.maxInvestmentSize.toString() ?? '');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      child: Column(
+        children: [
+          TextFormField(
+            controller: _symbolController,
+            decoration: const InputDecoration(labelText: 'Symbol'),
+            onChanged: (_) => _updateParameters(),
+          ),
+          TextFormField(
+            controller: _investmentAmountController,
+            decoration: const InputDecoration(labelText: 'Investment Amount'),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => _updateParameters(),
+          ),
+          TextFormField(
+            controller: _intervalDaysController,
+            decoration: const InputDecoration(labelText: 'Interval (days)'),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => _updateParameters(),
+          ),
+          TextFormField(
+            controller: _targetProfitPercentageController,
+            decoration: const InputDecoration(labelText: 'Target Profit (%)'),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => _updateParameters(),
+          ),
+          TextFormField(
+            controller: _stopLossPercentageController,
+            decoration: const InputDecoration(labelText: 'Stop Loss (%)'),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => _updateParameters(),
+          ),
+          TextFormField(
+            controller: _purchaseFrequencyController,
+            decoration:
+                const InputDecoration(labelText: 'Purchase Frequency (days)'),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => _updateParameters(),
+          ),
+          TextFormField(
+            controller: _maxInvestmentSizeController,
+            decoration: const InputDecoration(labelText: 'Max Investment Size'),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => _updateParameters(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _updateParameters() {
+    final parameters = StrategyParameters(
+      symbol: _symbolController.text,
+      investmentAmount: double.tryParse(_investmentAmountController.text) ?? 0,
+      intervalDays: int.tryParse(_intervalDaysController.text) ?? 0,
+      targetProfitPercentage:
+          double.tryParse(_targetProfitPercentageController.text) ?? 0,
+      stopLossPercentage:
+          double.tryParse(_stopLossPercentageController.text) ?? 0,
+      purchaseFrequency: int.tryParse(_purchaseFrequencyController.text) ?? 0,
+      maxInvestmentSize:
+          double.tryParse(_maxInvestmentSizeController.text) ?? 0,
+    );
+    widget.onParametersChanged(parameters);
+  }
+
+  @override
+  void dispose() {
+    _symbolController.dispose();
+    _investmentAmountController.dispose();
+    _intervalDaysController.dispose();
+    _targetProfitPercentageController.dispose();
+    _stopLossPercentageController.dispose();
+    _purchaseFrequencyController.dispose();
+    _maxInvestmentSizeController.dispose();
+    super.dispose();
+  }
+}
+
+```
+
+./lib/features/strategy/ui/pages/strategy_page.dart:
+```
+// lib/features/strategy/ui/pages/strategy_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
+import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_bloc.dart';
+import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_event.dart';
+import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_parameters_form.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_chart.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_status.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/risk_info_card.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/backtest_results.dart';
+
+class StrategyPage extends StatelessWidget {
+  const StrategyPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<StrategyBloc, StrategyState>(
+      listener: (context, state) {
+        if (state is StrategyError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is StrategyInitial || state is StrategyLoading) {
+          return const LoadingIndicator(message: 'Loading strategy...');
+        } else if (state is StrategyLoaded) {
+          return _buildLoadedContent(context, state);
+        } else if (state is StrategyError) {
+          return ErrorMessage(message: state.message);
+        }
+        return const ErrorMessage(message: 'Unknown state');
+      },
+    );
+  }
+
+  Widget _buildLoadedContent(BuildContext context, StrategyLoaded state) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CustomCard(
+              child: StrategyParametersForm(
+                initialParameters: state.parameters,
+                onParametersChanged: (parameters) {
+                  context
+                      .read<StrategyBloc>()
+                      .add(UpdateStrategyParameters(parameters));
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: StrategyStatusWidget(
+                status: _mapStateStatusToWidgetStatus(state.status),
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: StrategyChart(chartData: state.chartData),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: RiskInfoCard(
+                maxLossPercentage:
+                    state.riskManagementSettings.maxLossPercentage,
+                maxConcurrentTrades:
+                    state.riskManagementSettings.maxConcurrentTrades,
+                maxPositionSizePercentage:
+                    state.riskManagementSettings.maxPositionSizePercentage,
+                dailyExposureLimit:
+                    state.riskManagementSettings.dailyExposureLimit,
+                maxAllowedVolatility:
+                    state.riskManagementSettings.maxAllowedVolatility,
+                maxRebuyCount: state.riskManagementSettings.maxRebuyCount,
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: BacktestResults(
+                backtestResult: state.backtestResult,
+                onRunBacktest: (startDate, endDate) {
+                  context.read<StrategyBloc>().add(
+                        RunBacktestEvent(startDate, endDate),
+                      );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  StrategyStatus _mapStateStatusToWidgetStatus(StrategyStateStatus status) {
+    switch (status) {
+      case StrategyStateStatus.active:
+        return StrategyStatus.active;
+      case StrategyStateStatus.paused:
+        return StrategyStatus.paused;
+      case StrategyStateStatus.inactive:
+      default:
+        return StrategyStatus.inactive;
+    }
+  }
+}
+```
+
+./lib/features/strategy/blocs/strategy_bloc.dart:
+```
+import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_event.dart';
+import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
+import 'package:cost_averaging_trading_app/features/strategy/repositories/strategy_repository.dart';
+import 'package:cost_averaging_trading_app/features/settings/repositories/settings_repository.dart';
+
+class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
+  final StrategyRepository _strategyRepository;
+  final SettingsRepository _settingsRepository;
+  final BacktestingService _backtestingService;
+
+  StrategyBloc(this._strategyRepository, this._settingsRepository,
+      this._backtestingService)
+      : super(StrategyInitial()) {
+    on<LoadStrategyData>(_onLoadStrategyData);
+    on<UpdateStrategyParameters>(_onUpdateStrategyParameters);
+    on<StartStrategy>(_onStartStrategy);
+    on<StopStrategy>(_onStopStrategy);
+    on<RunBacktestEvent>(_onRunBacktest);
+
+    add(LoadStrategyData());
+  }
+
+  Future<void> _onLoadStrategyData(
+    LoadStrategyData event,
+    Emitter<StrategyState> emit,
+  ) async {
+    emit(StrategyLoading());
+    try {
+      final parameters = await _strategyRepository.getStrategyParameters();
+      final status = await _strategyRepository.getStrategyStatus();
+      final chartData = await _strategyRepository.getStrategyChartData();
+      final settings = await _settingsRepository.getSettings();
+
+      final riskManagementSettings = RiskManagementSettings(
+        maxLossPercentage: settings.maxLossPercentage,
+        maxConcurrentTrades: settings.maxConcurrentTrades,
+        maxPositionSizePercentage: settings.maxPositionSizePercentage,
+        dailyExposureLimit: settings.dailyExposureLimit,
+        maxAllowedVolatility: settings.maxAllowedVolatility,
+        maxRebuyCount: settings.maxRebuyCount,
+      );
+
+      emit(StrategyLoaded(
+        parameters: parameters,
+        status: status,
+        chartData: chartData,
+        riskManagementSettings: riskManagementSettings,
+      ));
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error loading strategy data', e, stackTrace);
+      emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+    }
+  }
+
+  Future<void> _onUpdateStrategyParameters(
+    UpdateStrategyParameters event,
+    Emitter<StrategyState> emit,
+  ) async {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      emit(StrategyLoading());
+      try {
+        await _strategyRepository.updateStrategyParameters(event.parameters);
+        emit(StrategyLoaded(
+          parameters: event.parameters,
+          status: currentState.status,
+          chartData: currentState.chartData,
+          riskManagementSettings: currentState.riskManagementSettings,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError(
+            'Error updating strategy parameters', e, stackTrace);
+        emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+
+  Future<void> _onStartStrategy(
+    StartStrategy event,
+    Emitter<StrategyState> emit,
+  ) async {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      emit(StrategyLoading());
+      try {
+        await _strategyRepository.startStrategy();
+        emit(StrategyLoaded(
+          parameters: currentState.parameters,
+          status: StrategyStateStatus.active,
+          chartData: currentState.chartData,
+          riskManagementSettings: currentState.riskManagementSettings,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError('Error starting strategy', e, stackTrace);
+        emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+
+  Future<void> _onStopStrategy(
+    StopStrategy event,
+    Emitter<StrategyState> emit,
+  ) async {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      emit(StrategyLoading());
+      try {
+        await _strategyRepository.stopStrategy();
+        emit(StrategyLoaded(
+          parameters: currentState.parameters,
+          status: StrategyStateStatus.inactive,
+          chartData: currentState.chartData,
+          riskManagementSettings: currentState.riskManagementSettings,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError('Error stopping strategy', e, stackTrace);
+        emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+
+  Future<void> _onRunBacktest(
+    RunBacktestEvent event,
+    Emitter<StrategyState> emit,
+  ) async {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      emit(StrategyLoading());
+      try {
+        final result = await _backtestingService.runBacktest(
+          currentState.parameters.symbol,
+          event.startDate,
+          event.endDate,
+          currentState.parameters,
+        );
+        emit(StrategyLoaded(
+          parameters: currentState.parameters,
+          status: currentState.status,
+          chartData: currentState.chartData,
+          riskManagementSettings: currentState.riskManagementSettings,
+          backtestResult: result,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError('Error running backtest', e, stackTrace);
+        emit(StrategyError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+}
+
+```
+
+./lib/features/strategy/blocs/strategy_state.dart:
+```
+// lib/features/strategy/blocs/strategy_state.dart
+
+import 'package:equatable/equatable.dart';
+import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+
+enum StrategyStateStatus { inactive, active, paused }
+
+abstract class StrategyState extends Equatable {
+  const StrategyState();
+
+  @override
+  List<Object> get props => [];
+}
+
+class StrategyInitial extends StrategyState {}
+
+class StrategyLoading extends StrategyState {}
+
+class StrategyLoaded extends StrategyState {
+  final StrategyParameters parameters;
+  final StrategyStateStatus status;
+  final List<Map<String, dynamic>> chartData;
+  final RiskManagementSettings riskManagementSettings;
+  final BacktestResult? backtestResult;
+
+  const StrategyLoaded({
+    required this.parameters,
+    required this.status,
+    required this.chartData,
+    required this.riskManagementSettings,
+    this.backtestResult,
+  });
+
+  @override
+  List<Object> get props => [
+        parameters,
+        status,
+        chartData,
+        riskManagementSettings,
+        if (backtestResult != null) backtestResult!,
+      ];
+}
+
+class RiskManagementSettings {
+  final double maxLossPercentage;
+  final int maxConcurrentTrades;
+  final double maxPositionSizePercentage;
+  final double dailyExposureLimit;
+  final double maxAllowedVolatility;
+  final int maxRebuyCount;
+
+  const RiskManagementSettings({
+    required this.maxLossPercentage,
+    required this.maxConcurrentTrades,
+    required this.maxPositionSizePercentage,
+    required this.dailyExposureLimit,
+    required this.maxAllowedVolatility,
+    required this.maxRebuyCount,
+  });
+}
+
+class StrategyError extends StrategyState {
+  final String message;
+
+  const StrategyError(this.message);
+
+  @override
+  List<Object> get props => [message];
+}
+
+```
+
+./lib/features/strategy/blocs/strategy_event.dart:
+```
+// lib/features/strategy/blocs/strategy_event.dart
+
+import 'package:equatable/equatable.dart';
+import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+
+abstract class StrategyEvent extends Equatable {
+  const StrategyEvent();
+
+  @override
+  List<Object> get props => [];
+}
+
+class LoadStrategyData extends StrategyEvent {}
+
+class UpdateStrategyParameters extends StrategyEvent {
+  final StrategyParameters parameters;
+
+  const UpdateStrategyParameters(this.parameters);
+
+  @override
+  List<Object> get props => [parameters];
+}
+
+class StartStrategy extends StrategyEvent {}
+
+class StopStrategy extends StrategyEvent {}
+
+class RunBacktestEvent extends StrategyEvent {
+  final DateTime startDate;
+  final DateTime endDate;
+
+  const RunBacktestEvent(this.startDate, this.endDate);
+
+  @override
+  List<Object> get props => [startDate, endDate];
+}
+
+```
+
+./lib/features/strategy/repositories/strategy_repository.dart:
+```
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
+import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+
+class StrategyRepository {
+  final ApiService apiService;
+  final DatabaseService databaseService;
+
+  StrategyRepository({required this.apiService, required this.databaseService});
+
+  Future<StrategyParameters> getStrategyParameters() async {
+    try {
+      final data = await apiService.get('/strategy/parameters');
+      return StrategyParameters.fromJson(data);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+          'Failed to get strategy parameters from API', e, stackTrace);
+      try {
+        final localData = await databaseService.query('strategy_parameters');
+        if (localData.isNotEmpty) {
+          return StrategyParameters.fromJson(localData.first);
+        }
+      } catch (e, stackTrace) {
+        ErrorHandler.logError(
+            'Failed to get strategy parameters from local database',
+            e,
+            stackTrace);
+      }
+      return StrategyParameters(
+        symbol: 'BTC/USDT',
+        investmentAmount: 100.0,
+        intervalDays: 7,
+        targetProfitPercentage: 5.0,
+        stopLossPercentage: 3.0,
+        purchaseFrequency: 1,
+        maxInvestmentSize: 1000.0,
+      );
+    }
+  }
+
+  Future<void> updateStrategyParameters(StrategyParameters parameters) async {
+    try {
+      await apiService.post('/strategy/parameters', parameters.toJson());
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+          'Failed to update strategy parameters on API', e, stackTrace);
+      try {
+        await databaseService.insert(
+            'strategy_parameters', parameters.toJson());
+      } catch (e, stackTrace) {
+        ErrorHandler.logError(
+            'Failed to save strategy parameters to local database',
+            e,
+            stackTrace);
+        throw Exception('Impossibile aggiornare i parametri della strategia');
+      }
+    }
+  }
+
+  Future<StrategyStateStatus> getStrategyStatus() async {
+    try {
+      final data = await apiService.get('/strategy/status');
+      return StrategyStateStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == data['status'],
+        orElse: () => StrategyStateStatus.inactive,
+      );
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get strategy status', e, stackTrace);
+      return StrategyStateStatus.inactive;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getStrategyChartData() async {
+    try {
+      final data = await apiService.get('/strategy/chart-data');
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get strategy chart data', e, stackTrace);
+      return [
+        {
+          'date': DateTime.now().subtract(const Duration(days: 30)),
+          'value': 1000
+        },
+        {
+          'date': DateTime.now().subtract(const Duration(days: 20)),
+          'value': 1100
+        },
+        {
+          'date': DateTime.now().subtract(const Duration(days: 10)),
+          'value': 1050
+        },
+        {'date': DateTime.now(), 'value': 1200},
+      ];
+    }
+  }
+
+  Future<void> startStrategy() async {
+    try {
+      await apiService.post('/strategy/start', {});
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to start strategy', e, stackTrace);
+      throw Exception('Impossibile avviare la strategia');
+    }
+  }
+
+  Future<void> stopStrategy() async {
+    try {
+      await apiService.post('/strategy/stop', {});
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to stop strategy', e, stackTrace);
+      throw Exception('Impossibile fermare la strategia');
+    }
+  }
+}
+
+```
+
+./lib/features/strategy/models/strategy_parameters.dart:
+```
+// lib/features/strategy/models/strategy_parameters.dart
+
+class StrategyParameters {
+  final String symbol;
+  final double investmentAmount;
+  final int intervalDays;
+  final double targetProfitPercentage;
+  final double stopLossPercentage;
+  final int purchaseFrequency; // Nuovo parametro
+  final double maxInvestmentSize; // Nuovo parametro
+
+  StrategyParameters({
+    required this.symbol,
+    required this.investmentAmount,
+    required this.intervalDays,
+    required this.targetProfitPercentage,
+    required this.stopLossPercentage,
+    required this.purchaseFrequency,
+    required this.maxInvestmentSize,
+  });
+
+  factory StrategyParameters.fromJson(Map<String, dynamic> json) {
+    return StrategyParameters(
+      symbol: json['symbol'],
+      investmentAmount: json['investmentAmount'].toDouble(),
+      intervalDays: json['intervalDays'],
+      targetProfitPercentage: json['targetProfitPercentage'].toDouble(),
+      stopLossPercentage: json['stopLossPercentage'].toDouble(),
+      purchaseFrequency: json['purchaseFrequency'],
+      maxInvestmentSize: json['maxInvestmentSize'].toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'symbol': symbol,
+      'investmentAmount': investmentAmount,
+      'intervalDays': intervalDays,
+      'targetProfitPercentage': targetProfitPercentage,
+      'stopLossPercentage': stopLossPercentage,
+      'purchaseFrequency': purchaseFrequency,
+      'maxInvestmentSize': maxInvestmentSize,
+    };
+  }
+}
+
+```
+
+./lib/features/strategy/models/strategy_model.dart:
+```
+class StrategyModel {
+  final double initialCapital;
+  final double riskPercentage;
+  final double minProfitTarget;
+  final double maxLossPercentage;
+  final int maxTrades;
+  final bool isActive;
+
+  StrategyModel({
+    required this.initialCapital,
+    required this.riskPercentage,
+    required this.minProfitTarget,
+    required this.maxLossPercentage,
+    required this.maxTrades,
+    required this.isActive,
+  });
+
+  StrategyModel copyWith({
+    double? initialCapital,
+    double? riskPercentage,
+    double? minProfitTarget,
+    double? maxLossPercentage,
+    int? maxTrades,
+    bool? isActive,
+  }) {
+    return StrategyModel(
+      initialCapital: initialCapital ?? this.initialCapital,
+      riskPercentage: riskPercentage ?? this.riskPercentage,
+      minProfitTarget: minProfitTarget ?? this.minProfitTarget,
+      maxLossPercentage: maxLossPercentage ?? this.maxLossPercentage,
+      maxTrades: maxTrades ?? this.maxTrades,
+      isActive: isActive ?? this.isActive,
+    );
+  }
+}
+
+```
+
+./lib/features/settings/ui/widgets/backtesting_settings.dart:
+```
+import 'package:flutter/material.dart';
+
+class BacktestingSettings extends StatelessWidget {
+  final bool isBacktestingEnabled;
+  final VoidCallback onToggleBacktesting;
+  final VoidCallback onRunBacktest;
+
+  const BacktestingSettings({
+    super.key,
+    required this.isBacktestingEnabled,
+    required this.onToggleBacktesting,
+    required this.onRunBacktest,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Backtesting', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Enable Backtesting',
+                    style: Theme.of(context).textTheme.titleMedium),
+                Switch(
+                  value: isBacktestingEnabled,
+                  onChanged: (_) => onToggleBacktesting(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: isBacktestingEnabled ? onRunBacktest : null,
+              child: const Text('Run Backtest'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/settings/ui/widgets/api_settings.dart:
+```
+// lib/features/settings/ui/widgets/api_settings.dart
+
+import 'package:flutter/material.dart';
+
+class ApiSettings extends StatelessWidget {
+  final String apiKey;
+  final String secretKey;
+  final Function(String) onApiKeyChanged;
+  final Function(String) onSecretKeyChanged;
+
+  const ApiSettings({
+    super.key,
+    required this.apiKey,
+    required this.secretKey,
+    required this.onApiKeyChanged,
+    required this.onSecretKeyChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('API Settings', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              initialValue: apiKey,
+              decoration: const InputDecoration(
+                labelText: 'API Key',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: onApiKeyChanged,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              initialValue: secretKey,
+              decoration: const InputDecoration(
+                labelText: 'Secret Key',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              onChanged: onSecretKeyChanged,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+./lib/features/settings/ui/widgets/demo_mode_toggle.dart:
+```
+import 'package:flutter/material.dart';
+
+class DemoModeToggle extends StatelessWidget {
+  final bool isDemoMode;
+  final ValueChanged<bool> onToggle;
+
+  const DemoModeToggle({
+    super.key,
+    required this.isDemoMode,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Demo Mode', style: Theme.of(context).textTheme.titleMedium),
+            Switch(
+              value: isDemoMode,
+              onChanged: onToggle,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+./lib/features/settings/ui/widgets/risk_management.dart:
+```
+import 'package:flutter/material.dart';
+
+class RiskManagement extends StatelessWidget {
+  final double maxLossPercentage;
+  final int maxConcurrentTrades;
+  final double maxPositionSizePercentage;
+  final double dailyExposureLimit;
+  final double maxAllowedVolatility;
+  final int maxRebuyCount;
+  final Function(double, int, double, double, double, int)
+      onUpdateRiskManagement;
+
+  const RiskManagement({
+    super.key,
+    required this.maxLossPercentage,
+    required this.maxConcurrentTrades,
+    required this.maxPositionSizePercentage,
+    required this.dailyExposureLimit,
+    required this.maxAllowedVolatility,
+    required this.maxRebuyCount,
+    required this.onUpdateRiskManagement,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Risk Management', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        _buildSlider(
+          context,
+          'Max Loss Percentage',
+          maxLossPercentage,
+          0.0,
+          10.0,
+          (value) => onUpdateRiskManagement(
+              value,
+              maxConcurrentTrades,
+              maxPositionSizePercentage,
+              dailyExposureLimit,
+              maxAllowedVolatility,
+              maxRebuyCount),
+        ),
+        _buildSlider(
+          context,
+          'Max Concurrent Trades',
+          maxConcurrentTrades.toDouble(),
+          1,
+          10,
+          (value) => onUpdateRiskManagement(
+              maxLossPercentage,
+              value.toInt(),
+              maxPositionSizePercentage,
+              dailyExposureLimit,
+              maxAllowedVolatility,
+              maxRebuyCount),
+        ),
+        _buildSlider(
+          context,
+          'Max Position Size Percentage',
+          maxPositionSizePercentage,
+          1.0,
+          100.0,
+          (value) => onUpdateRiskManagement(
+              maxLossPercentage,
+              maxConcurrentTrades,
+              value,
+              dailyExposureLimit,
+              maxAllowedVolatility,
+              maxRebuyCount),
+        ),
+        _buildSlider(
+          context,
+          'Daily Exposure Limit',
+          dailyExposureLimit,
+          100.0,
+          10000.0,
+          (value) => onUpdateRiskManagement(
+              maxLossPercentage,
+              maxConcurrentTrades,
+              maxPositionSizePercentage,
+              value,
+              maxAllowedVolatility,
+              maxRebuyCount),
+        ),
+        _buildSlider(
+          context,
+          'Max Allowed Volatility',
+          maxAllowedVolatility,
+          0.0,
+          1.0,
+          (value) => onUpdateRiskManagement(
+              maxLossPercentage,
+              maxConcurrentTrades,
+              maxPositionSizePercentage,
+              dailyExposureLimit,
+              value,
+              maxRebuyCount),
+        ),
+        _buildSlider(
+          context,
+          'Max Rebuy Count',
+          maxRebuyCount.toDouble(),
+          1,
+          10,
+          (value) => onUpdateRiskManagement(
+              maxLossPercentage,
+              maxConcurrentTrades,
+              maxPositionSizePercentage,
+              dailyExposureLimit,
+              maxAllowedVolatility,
+              value.toInt()),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSlider(BuildContext context, String label, double value,
+      double min, double max, Function(double) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.titleMedium),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: 100,
+          label: value.toStringAsFixed(2),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+}
+
+```
+
+./lib/features/settings/ui/pages/settings_page.dart:
+```
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_bloc.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_event.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_state.dart';
+import 'package:cost_averaging_trading_app/features/settings/ui/widgets/api_settings.dart';
+import 'package:cost_averaging_trading_app/features/settings/ui/widgets/backtesting_settings.dart';
+import 'package:cost_averaging_trading_app/features/settings/ui/widgets/demo_mode_toggle.dart';
+import 'package:cost_averaging_trading_app/features/settings/ui/widgets/risk_management.dart';
+
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<SettingsBloc, SettingsState>(
+      listener: (context, state) {
+        if (state is SettingsError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is SettingsLoading) {
+          return const LoadingIndicator(message: 'Loading settings...');
+        } else if (state is SettingsLoaded) {
+          return _buildSettingsContent(context, state);
+        } else if (state is SettingsError) {
+          return ErrorMessage(message: state.message);
+        }
+        return const ErrorMessage(message: 'Unknown state');
+      },
+    );
+  }
+
+  Widget _buildSettingsContent(BuildContext context, SettingsLoaded state) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CustomCard(
+              child: ApiSettings(
+                apiKey: state.apiKey,
+                secretKey: state.secretKey,
+                onApiKeyChanged: (newKey) {
+                  context.read<SettingsBloc>().add(UpdateApiKey(newKey));
+                },
+                onSecretKeyChanged: (newKey) {
+                  context.read<SettingsBloc>().add(UpdateSecretKey(newKey));
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: DemoModeToggle(
+                isDemoMode: state.isDemoMode,
+                onToggle: (isDemo) {
+                  context.read<SettingsBloc>().add(ToggleDemoMode());
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: BacktestingSettings(
+                isBacktestingEnabled: state.isBacktestingEnabled,
+                onToggleBacktesting: () {
+                  context.read<SettingsBloc>().add(ToggleBacktesting());
+                },
+                onRunBacktest: () {
+                  // Implementare la logica per eseguire il backtesting
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
+              child: RiskManagement(
+                maxLossPercentage: state.maxLossPercentage,
+                maxConcurrentTrades: state.maxConcurrentTrades,
+                maxPositionSizePercentage: state.maxPositionSizePercentage,
+                dailyExposureLimit: state.dailyExposureLimit,
+                maxAllowedVolatility: state.maxAllowedVolatility,
+                maxRebuyCount: state.maxRebuyCount,
+                onUpdateRiskManagement: (
+                  maxLoss,
+                  maxTrades,
+                  maxPositionSize,
+                  dailyExposure,
+                  maxVolatility,
+                  rebuyCount,
+                ) {
+                  context.read<SettingsBloc>().add(UpdateRiskManagement(
+                        maxLoss,
+                        maxTrades,
+                        maxPositionSize,
+                        dailyExposure,
+                        maxVolatility,
+                        rebuyCount,
+                      ));
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/settings/blocs/settings_event.dart:
+```
+// lib/features/settings/blocs/settings_event.dart
+
+import 'package:equatable/equatable.dart';
+
+abstract class SettingsEvent extends Equatable {
+  const SettingsEvent();
+
+  @override
+  List<Object> get props => [];
+}
+
+class LoadSettings extends SettingsEvent {}
+
+class UpdateApiKey extends SettingsEvent {
+  final String apiKey;
+
+  const UpdateApiKey(this.apiKey);
+
+  @override
+  List<Object> get props => [apiKey];
+}
+
+class UpdateSecretKey extends SettingsEvent {
+  final String secretKey;
+
+  const UpdateSecretKey(this.secretKey);
+
+  @override
+  List<Object> get props => [secretKey];
+}
+
+class ToggleDemoMode extends SettingsEvent {}
+
+class ToggleBacktesting extends SettingsEvent {}
+
+class UpdateRiskManagement extends SettingsEvent {
+  final double maxLossPercentage;
+  final int maxConcurrentTrades;
+  final double maxPositionSizePercentage;
+  final double dailyExposureLimit;
+  final double maxAllowedVolatility;
+  final int maxRebuyCount;
+
+  const UpdateRiskManagement(
+    this.maxLossPercentage,
+    this.maxConcurrentTrades,
+    this.maxPositionSizePercentage,
+    this.dailyExposureLimit,
+    this.maxAllowedVolatility,
+    this.maxRebuyCount,
+  );
+
+  @override
+  List<Object> get props => [
+        maxLossPercentage,
+        maxConcurrentTrades,
+        maxPositionSizePercentage,
+        dailyExposureLimit,
+        maxAllowedVolatility,
+        maxRebuyCount,
+      ];
+}
+
+```
+
+./lib/features/settings/blocs/settings_state.dart:
+```
+// lib/features/settings/blocs/settings_state.dart
+
+import 'package:equatable/equatable.dart';
+
+abstract class SettingsState extends Equatable {
+  const SettingsState();
+
+  @override
+  List<Object> get props => [];
+}
+
+class SettingsInitial extends SettingsState {}
+
+class SettingsLoading extends SettingsState {}
+
+class SettingsLoaded extends SettingsState {
+  final String apiKey;
+  final String secretKey;
+  final bool isDemoMode;
+  final bool isBacktestingEnabled;
+  final double maxLossPercentage;
+  final int maxConcurrentTrades;
+  final double maxPositionSizePercentage;
+  final double dailyExposureLimit;
+  final double maxAllowedVolatility;
+  final int maxRebuyCount;
+
+  const SettingsLoaded({
+    required this.apiKey,
+    required this.secretKey,
+    required this.isDemoMode,
+    required this.isBacktestingEnabled,
+    required this.maxLossPercentage,
+    required this.maxConcurrentTrades,
+    required this.maxPositionSizePercentage,
+    required this.dailyExposureLimit,
+    required this.maxAllowedVolatility,
+    required this.maxRebuyCount,
+  });
+
+  @override
+  List<Object> get props => [
+        apiKey,
+        secretKey,
+        isDemoMode,
+        isBacktestingEnabled,
+        maxLossPercentage,
+        maxConcurrentTrades,
+        maxPositionSizePercentage,
+        dailyExposureLimit,
+        maxAllowedVolatility,
+        maxRebuyCount,
+      ];
+}
+
+class SettingsError extends SettingsState {
+  final String message;
+
+  const SettingsError(this.message);
+
+  @override
+  List<Object> get props => [message];
+}
+
+```
+
+./lib/features/settings/blocs/settings_bloc.dart:
+```
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_event.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_state.dart';
+import 'package:cost_averaging_trading_app/features/settings/repositories/settings_repository.dart';
+
+class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
+  final SettingsRepository _repository;
+
+  SettingsBloc(this._repository) : super(SettingsInitial()) {
+    on<LoadSettings>(_onLoadSettings);
+    on<UpdateApiKey>(_onUpdateApiKey);
+    on<UpdateSecretKey>(_onUpdateSecretKey);
+    on<ToggleDemoMode>(_onToggleDemoMode);
+    on<ToggleBacktesting>(_onToggleBacktesting);
+    on<UpdateRiskManagement>(_onUpdateRiskManagement);
+    add(LoadSettings());
+  }
+
+  Future<void> _onLoadSettings(
+    LoadSettings event,
+    Emitter<SettingsState> emit,
+  ) async {
+    emit(SettingsLoading());
+    try {
+      final settings = await _repository.getSettings();
+      emit(SettingsLoaded(
+        apiKey: settings.apiKey,
+        secretKey: settings.secretKey,
+        isDemoMode: settings.isDemoMode,
+        isBacktestingEnabled: settings.isBacktestingEnabled,
+        maxLossPercentage: settings.maxLossPercentage,
+        maxConcurrentTrades: settings.maxConcurrentTrades,
+        maxPositionSizePercentage: settings.maxPositionSizePercentage,
+        dailyExposureLimit: settings.dailyExposureLimit,
+        maxAllowedVolatility: settings.maxAllowedVolatility,
+        maxRebuyCount: settings.maxRebuyCount,
+      ));
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error loading settings', e, stackTrace);
+      emit(SettingsError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+    }
+  }
+
+  Future<void> _onUpdateApiKey(
+    UpdateApiKey event,
+    Emitter<SettingsState> emit,
+  ) async {
+    if (state is SettingsLoaded) {
+      final currentState = state as SettingsLoaded;
+      try {
+        await _repository.updateApiKey(event.apiKey);
+        emit(SettingsLoaded(
+          apiKey: event.apiKey,
+          secretKey: currentState.secretKey,
+          isDemoMode: currentState.isDemoMode,
+          isBacktestingEnabled: currentState.isBacktestingEnabled,
+          maxLossPercentage: currentState.maxLossPercentage,
+          maxConcurrentTrades: currentState.maxConcurrentTrades,
+          maxPositionSizePercentage: currentState.maxPositionSizePercentage,
+          dailyExposureLimit: currentState.dailyExposureLimit,
+          maxAllowedVolatility: currentState.maxAllowedVolatility,
+          maxRebuyCount: currentState.maxRebuyCount,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError('Error updating API key', e, stackTrace);
+        emit(SettingsError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+
+  Future<void> _onUpdateSecretKey(
+    UpdateSecretKey event,
+    Emitter<SettingsState> emit,
+  ) async {
+    if (state is SettingsLoaded) {
+      final currentState = state as SettingsLoaded;
+      try {
+        await _repository.updateSecretKey(event.secretKey);
+        emit(SettingsLoaded(
+          apiKey: currentState.apiKey,
+          secretKey: event.secretKey,
+          isDemoMode: currentState.isDemoMode,
+          isBacktestingEnabled: currentState.isBacktestingEnabled,
+          maxLossPercentage: currentState.maxLossPercentage,
+          maxConcurrentTrades: currentState.maxConcurrentTrades,
+          maxPositionSizePercentage: currentState.maxPositionSizePercentage,
+          dailyExposureLimit: currentState.dailyExposureLimit,
+          maxAllowedVolatility: currentState.maxAllowedVolatility,
+          maxRebuyCount: currentState.maxRebuyCount,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError('Error updating Secret key', e, stackTrace);
+        emit(SettingsError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+
+  Future<void> _onToggleDemoMode(
+    ToggleDemoMode event,
+    Emitter<SettingsState> emit,
+  ) async {
+    if (state is SettingsLoaded) {
+      final currentState = state as SettingsLoaded;
+      try {
+        final newDemoMode = !currentState.isDemoMode;
+        await _repository.updateDemoMode(newDemoMode);
+        emit(SettingsLoaded(
+          apiKey: currentState.apiKey,
+          secretKey: currentState.secretKey,
+          isDemoMode: newDemoMode,
+          isBacktestingEnabled: currentState.isBacktestingEnabled,
+          maxLossPercentage: currentState.maxLossPercentage,
+          maxConcurrentTrades: currentState.maxConcurrentTrades,
+          maxPositionSizePercentage: currentState.maxPositionSizePercentage,
+          dailyExposureLimit: currentState.dailyExposureLimit,
+          maxAllowedVolatility: currentState.maxAllowedVolatility,
+          maxRebuyCount: currentState.maxRebuyCount,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError('Error toggle demoMode settings', e, stackTrace);
+        emit(SettingsError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+
+  Future<void> _onToggleBacktesting(
+    ToggleBacktesting event,
+    Emitter<SettingsState> emit,
+  ) async {
+    if (state is SettingsLoaded) {
+      final currentState = state as SettingsLoaded;
+      try {
+        final newBacktestingMode = !currentState.isBacktestingEnabled;
+        await _repository.updateBacktestingMode(newBacktestingMode);
+        emit(SettingsLoaded(
+          apiKey: currentState.apiKey,
+          secretKey: currentState.secretKey,
+          isDemoMode: currentState.isDemoMode,
+          isBacktestingEnabled: newBacktestingMode,
+          maxLossPercentage: currentState.maxLossPercentage,
+          maxConcurrentTrades: currentState.maxConcurrentTrades,
+          maxPositionSizePercentage: currentState.maxPositionSizePercentage,
+          dailyExposureLimit: currentState.dailyExposureLimit,
+          maxAllowedVolatility: currentState.maxAllowedVolatility,
+          maxRebuyCount: currentState.maxRebuyCount,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError(
+            'Error toggle backtesting settings', e, stackTrace);
+        emit(SettingsError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+
+  Future<void> _onUpdateRiskManagement(
+    UpdateRiskManagement event,
+    Emitter<SettingsState> emit,
+  ) async {
+    if (state is SettingsLoaded) {
+      final currentState = state as SettingsLoaded;
+      try {
+        await _repository.updateRiskManagement(
+          maxLossPercentage: event.maxLossPercentage,
+          maxConcurrentTrades: event.maxConcurrentTrades,
+          maxPositionSizePercentage: event.maxPositionSizePercentage,
+          dailyExposureLimit: event.dailyExposureLimit,
+          maxAllowedVolatility: event.maxAllowedVolatility,
+          maxRebuyCount: event.maxRebuyCount,
+        );
+        emit(SettingsLoaded(
+          apiKey: currentState.apiKey,
+          secretKey: currentState.secretKey,
+          isDemoMode: currentState.isDemoMode,
+          isBacktestingEnabled: currentState.isBacktestingEnabled,
+          maxLossPercentage: event.maxLossPercentage,
+          maxConcurrentTrades: event.maxConcurrentTrades,
+          maxPositionSizePercentage: event.maxPositionSizePercentage,
+          dailyExposureLimit: event.dailyExposureLimit,
+          maxAllowedVolatility: event.maxAllowedVolatility,
+          maxRebuyCount: event.maxRebuyCount,
+        ));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError(
+            'Error updating risk management settings', e, stackTrace);
+        emit(SettingsError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      }
+    }
+  }
+}
+
+```
+
+./lib/features/settings/repositories/settings_repository.dart:
+```
+// lib/features/settings/repositories/settings_repository.dart
+
+import 'package:cost_averaging_trading_app/core/services/secure_storage_service.dart';
+
+class SettingsRepository {
+  final SecureStorageService _secureStorage;
+
+  SettingsRepository(this._secureStorage);
+
+  Future<Settings> getSettings() async {
+    final apiKey = await _secureStorage.getApiKey() ?? '';
+    final secretKey = await _secureStorage.getSecretKey() ?? '';
+    final isDemoMode = await _secureStorage.getValue('isDemoMode') == 'true';
+    final isBacktestingEnabled =
+        await _secureStorage.getValue('isBacktestingEnabled') == 'true';
+    final maxLossPercentage = double.parse(
+        await _secureStorage.getValue('maxLossPercentage') ?? '2.0');
+    final maxConcurrentTrades =
+        int.parse(await _secureStorage.getValue('maxConcurrentTrades') ?? '3');
+    final maxPositionSizePercentage = double.parse(
+        await _secureStorage.getValue('maxPositionSizePercentage') ?? '10.0');
+    final dailyExposureLimit = double.parse(
+        await _secureStorage.getValue('dailyExposureLimit') ?? '1000.0');
+    final maxAllowedVolatility = double.parse(
+        await _secureStorage.getValue('maxAllowedVolatility') ?? '0.05');
+    final maxRebuyCount =
+        int.parse(await _secureStorage.getValue('maxRebuyCount') ?? '5');
+
+    return Settings(
+      apiKey: apiKey,
+      secretKey: secretKey,
+      isDemoMode: isDemoMode,
+      isBacktestingEnabled: isBacktestingEnabled,
+      maxLossPercentage: maxLossPercentage,
+      maxConcurrentTrades: maxConcurrentTrades,
+      maxPositionSizePercentage: maxPositionSizePercentage,
+      dailyExposureLimit: dailyExposureLimit,
+      maxAllowedVolatility: maxAllowedVolatility,
+      maxRebuyCount: maxRebuyCount,
+    );
+  }
+
+  Future<void> updateApiKey(String apiKey) async {
+    await _secureStorage.saveApiKey(apiKey);
+  }
+
+  Future<void> updateSecretKey(String secretKey) async {
+    await _secureStorage.saveSecretKey(secretKey);
+  }
+
+  Future<void> updateDemoMode(bool isDemoMode) async {
+    await _secureStorage.saveValue('isDemoMode', isDemoMode.toString());
+  }
+
+  Future<void> updateBacktestingMode(bool isBacktestingEnabled) async {
+    await _secureStorage.saveValue(
+        'isBacktestingEnabled', isBacktestingEnabled.toString());
+  }
+
+  Future<void> updateRiskManagement({
+    required double maxLossPercentage,
+    required int maxConcurrentTrades,
+    required double maxPositionSizePercentage,
+    required double dailyExposureLimit,
+    required double maxAllowedVolatility,
+    required int maxRebuyCount,
+  }) async {
+    await _secureStorage.saveValue(
+        'maxLossPercentage', maxLossPercentage.toString());
+    await _secureStorage.saveValue(
+        'maxConcurrentTrades', maxConcurrentTrades.toString());
+    await _secureStorage.saveValue(
+        'maxPositionSizePercentage', maxPositionSizePercentage.toString());
+    await _secureStorage.saveValue(
+        'dailyExposureLimit', dailyExposureLimit.toString());
+    await _secureStorage.saveValue(
+        'maxAllowedVolatility', maxAllowedVolatility.toString());
+    await _secureStorage.saveValue('maxRebuyCount', maxRebuyCount.toString());
+  }
+}
+
+class Settings {
+  final String apiKey;
+  final String secretKey;
+  final bool isDemoMode;
+  final bool isBacktestingEnabled;
+  final double maxLossPercentage;
+  final int maxConcurrentTrades;
+  final double maxPositionSizePercentage;
+  final double dailyExposureLimit;
+  final double maxAllowedVolatility;
+  final int maxRebuyCount;
+
+  Settings({
+    required this.apiKey,
+    required this.secretKey,
+    required this.isDemoMode,
+    required this.isBacktestingEnabled,
+    required this.maxLossPercentage,
+    required this.maxConcurrentTrades,
+    required this.maxPositionSizePercentage,
+    required this.dailyExposureLimit,
+    required this.maxAllowedVolatility,
+    required this.maxRebuyCount,
+  });
+}
+
+```
+
+./lib/features/settings/models/settings_model.dart:
+```
+class SettingsModel {
+  final String apiKey;
+  final String secretKey;
+  final bool isBacktestingMode;
+  final double maxLossPercentage;
+  final int maxConcurrentTrades;
+  final bool isDemoMode;
+  final double maxPositionSizePercentage;
+  final double dailyExposureLimit;
+  // Nuove proprietà aggiunte
+  final double maxAllowedVolatility;
+  final int maxRebuyCount;
+
+  SettingsModel({
+    required this.apiKey,
+    required this.secretKey,
+    required this.isBacktestingMode,
+    required this.maxLossPercentage,
+    required this.maxConcurrentTrades,
+    required this.isDemoMode,
+    required this.maxPositionSizePercentage,
+    required this.dailyExposureLimit,
+    required this.maxAllowedVolatility,
+    required this.maxRebuyCount,
+  });
+
+  factory SettingsModel.fromJson(Map<String, dynamic> json) {
+    return SettingsModel(
+      apiKey: json['apiKey'] as String,
+      secretKey: json['secretKey'] as String,
+      isBacktestingMode: json['isBacktestingMode'] as bool,
+      maxLossPercentage: json['maxLossPercentage'] as double,
+      maxConcurrentTrades: json['maxConcurrentTrades'] as int,
+      isDemoMode: json['isDemoMode'] as bool,
+      maxPositionSizePercentage: json['maxPositionSizePercentage'] as double,
+      dailyExposureLimit: json['dailyExposureLimit'] as double,
+      maxAllowedVolatility: json['maxAllowedVolatility'] as double,
+      maxRebuyCount: json['maxRebuyCount'] as int,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'apiKey': apiKey,
+      'secretKey': secretKey,
+      'isBacktestingMode': isBacktestingMode,
+      'maxLossPercentage': maxLossPercentage,
+      'maxConcurrentTrades': maxConcurrentTrades,
+      'isDemoMode': isDemoMode,
+      'maxPositionSizePercentage': maxPositionSizePercentage,
+      'dailyExposureLimit': dailyExposureLimit,
+      'maxAllowedVolatility': maxAllowedVolatility,
+      'maxRebuyCount': maxRebuyCount,
+    };
+  }
+
+  SettingsModel copyWith({
+    String? apiKey,
+    String? secretKey,
+    bool? isBacktestingMode,
+    double? maxLossPercentage,
+    int? maxConcurrentTrades,
+    bool? isDemoMode,
+    double? maxPositionSizePercentage,
+    double? dailyExposureLimit,
+    double? maxAllowedVolatility,
+    int? maxRebuyCount,
+  }) {
+    return SettingsModel(
+      apiKey: apiKey ?? this.apiKey,
+      secretKey: secretKey ?? this.secretKey,
+      isBacktestingMode: isBacktestingMode ?? this.isBacktestingMode,
+      maxLossPercentage: maxLossPercentage ?? this.maxLossPercentage,
+      maxConcurrentTrades: maxConcurrentTrades ?? this.maxConcurrentTrades,
+      isDemoMode: isDemoMode ?? this.isDemoMode,
+      maxPositionSizePercentage:
+          maxPositionSizePercentage ?? this.maxPositionSizePercentage,
+      dailyExposureLimit: dailyExposureLimit ?? this.dailyExposureLimit,
+      maxAllowedVolatility: maxAllowedVolatility ?? this.maxAllowedVolatility,
+      maxRebuyCount: maxRebuyCount ?? this.maxRebuyCount,
+    );
+  }
+}
+
+```
+
+./lib/features/dashboard/ui/widgets/portfolio_overview.dart:
+```
+// lib/features/dashboard/ui/widgets/portfolio_overview.dart
+
+import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
+
+class PortfolioOverview extends StatelessWidget {
+  final Portfolio portfolio;
+
+  const PortfolioOverview({super.key, required this.portfolio});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Portfolio Overview',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Text('Total Value: \$${portfolio.totalValue.toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            ...portfolio.assets.entries
+                .map((entry) =>
+                    Text('${entry.key}: ${entry.value.toStringAsFixed(8)}'))
+                ,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/dashboard/ui/widgets/recent_trades_widget.dart:
+```
+import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:intl/intl.dart';
+
+class RecentTradesWidget extends StatelessWidget {
+  final List<CoreTrade> trades;
+
+  const RecentTradesWidget({super.key, required this.trades});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Recent Trades',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            ...trades.map((trade) => _buildTradeItem(trade)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTradeItem(CoreTrade trade) {
+    return ListTile(
+      title: Text(
+          '${trade.type == CoreTradeType.buy ? 'Buy' : 'Sell'} ${trade.symbol}'),
+      subtitle: Text(
+          'Amount: ${trade.amount.toStringAsFixed(8)} | Price: \$${trade.price.toStringAsFixed(2)}'),
+      trailing: Text(DateFormat('yyyy-MM-dd HH:mm').format(trade.timestamp)),
+    );
+  }
+}
+
+```
+
+./lib/features/dashboard/ui/widgets/performance_chart.dart:
+```
+// lib/features/dashboard/ui/widgets/performance_chart.dart
+
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+
+class PerformanceChart extends StatelessWidget {
+  final List<Map<String, dynamic>> performanceData;
+
+  const PerformanceChart({super.key, required this.performanceData});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Performance Chart',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  gridData: const FlGridData(show: false),
+                  titlesData: const FlTitlesData(show: false),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: performanceData.asMap().entries.map((entry) {
+                        // Converti esplicitamente sia la chiave che il valore in double
+                        return FlSpot(
+                          entry.key.toDouble(),
+                          (entry.value['value'] is int)
+                              ? (entry.value['value'] as int).toDouble()
+                              : entry.value['value'] as double,
+                        );
+                      }).toList(),
+                      isCurved: true,
+                      color: Theme.of(context).primaryColor,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: Theme.of(context).primaryColor.withOpacity(0.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/dashboard/ui/pages/dashboard_page.dart:
+```
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_state.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/portfolio_overview.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/recent_trades_widget.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/performance_chart.dart';
+
+class DashboardPage extends StatelessWidget {
+  const DashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<DashboardBloc, DashboardState>(
+      listener: (context, state) {
+        if (state is DashboardError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is DashboardInitial) {
+          context.read<DashboardBloc>().add(LoadDashboardData());
+          return const LoadingIndicator(message: 'Loading dashboard...');
+        } else if (state is DashboardLoading) {
+          return const LoadingIndicator(message: 'Updating dashboard...');
+        } else if (state is DashboardLoaded) {
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CustomCard(
+                    child: PortfolioOverview(portfolio: state.portfolio),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomCard(
+                    child: PerformanceChart(
+                        performanceData: state.performanceData),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomCard(
+                    child: RecentTradesWidget(trades: state.recentTrades),
+                  ),
+                ],
+              ),
+            ),
+          );
+        } else if (state is DashboardError) {
+          return ErrorMessage(message: state.message);
+        }
+        return const ErrorMessage(message: 'Unknown state');
+      },
+    );
+  }
+}
+
+```
+
+./lib/features/dashboard/blocs/dashboard_event.dart:
+```
+// lib/features/dashboard/blocs/dashboard_event.dart
+
+abstract class DashboardEvent {}
+
+class LoadDashboardData extends DashboardEvent {}
+
+```
+
+./lib/features/dashboard/blocs/dashboard_state.dart:
+```
+import 'package:equatable/equatable.dart';
+import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+
+abstract class DashboardState extends Equatable {
+  const DashboardState();
+
+  @override
+  List<Object> get props => [];
+}
+
+class DashboardInitial extends DashboardState {}
+
+class DashboardLoading extends DashboardState {}
+
+class DashboardLoaded extends DashboardState {
+  final Portfolio portfolio;
+  final List<CoreTrade> recentTrades;
+  final List<Map<String, dynamic>> performanceData;
+
+  const DashboardLoaded({
+    required this.portfolio,
+    required this.recentTrades,
+    required this.performanceData,
+  });
+
+  @override
+  List<Object> get props => [portfolio, recentTrades, performanceData];
+}
+
+class DashboardError extends DashboardState {
+  final String message;
+
+  const DashboardError(this.message);
+
+  @override
+  List<Object> get props => [message];
+}
+
+```
+
+./lib/features/dashboard/blocs/dashboard_bloc.dart:
+```
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_state.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/repositories/dashboard_repository.dart';
+
+class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
+  final DashboardRepository _repository;
+
+  DashboardBloc(this._repository) : super(DashboardInitial()) {
+    on<LoadDashboardData>(_onLoadDashboardData);
+  }
+
+  Future<void> _onLoadDashboardData(
+    LoadDashboardData event,
+    Emitter<DashboardState> emit,
+  ) async {
+    emit(DashboardLoading());
+    try {
+      final portfolio = await _repository.getPortfolio();
+      final recentTrades = await _repository.getRecentTrades();
+      final performanceData = await _repository.getPerformanceData();
+      emit(DashboardLoaded(
+        portfolio: portfolio,
+        recentTrades: recentTrades,
+        performanceData: performanceData,
+      ));
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error loading dashboard data', e, stackTrace);
+      emit(DashboardError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+    }
+  }
+}
+```
+
+./lib/features/dashboard/repositories/dashboard_repository.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+
+class DashboardRepository {
+  final ApiService apiService;
+  final DatabaseService databaseService;
+
+  DashboardRepository(
+      {required this.apiService, required this.databaseService});
+
+  Future<Portfolio> getPortfolio() async {
+    try {
+      // Prova prima a ottenere i dati dall'API
+      final data = await apiService.get('/portfolio');
+      return Portfolio.fromJson(data);
+    } catch (e) {
+      // Se fallisce, prova a recuperare i dati dal database locale
+      final localData = await databaseService.query('portfolio');
+      if (localData.isNotEmpty) {
+        return Portfolio.fromJson(localData.first);
+      }
+      // Se non ci sono dati, restituisci un portfolio vuoto
+      return const Portfolio(id: '0', assets: {}, totalValue: 0.0);
+    }
+  }
+
+  Future<List<CoreTrade>> getRecentTrades() async {
+    try {
+      // Prova prima a ottenere i dati dall'API
+      final data = await apiService.get('/recent_trades');
+      return (data as List).map((trade) => CoreTrade.fromJson(trade)).toList();
+    } catch (e) {
+      // Se fallisce, prova a recuperare i dati dal database locale
+      final localData = await databaseService.query('trades');
+      return localData.map((trade) => CoreTrade.fromJson(trade)).toList();
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPerformanceData() async {
+    try {
+      // Prova prima a ottenere i dati dall'API
+      final data = await apiService.get('/performance');
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      // Se fallisce, restituisci dati di esempio
+      return [
+        {'date': DateTime.now().subtract(const Duration(days: 30)), 'value': 1000},
+        {'date': DateTime.now().subtract(const Duration(days: 20)), 'value': 1100},
+        {'date': DateTime.now().subtract(const Duration(days: 10)), 'value': 1050},
+        {'date': DateTime.now(), 'value': 1200},
+      ];
+    }
+  }
+}
+
+```
+
+./lib/features/dashboard/models/dashboard_model.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+
+class DashboardModel {
+  final String portfolioValue;
+  final String activeTrades;
+  final String totalProfit;
+  final String totalLoss;
+  final List<CoreTrade> recentTrades;
+  final List<PortfolioItem> portfolioItems;
+  final List<Notification> notifications;
+
+  DashboardModel({
+    required this.portfolioValue,
+    required this.activeTrades,
+    required this.totalProfit,
+    required this.totalLoss,
+    required this.recentTrades,
+    required this.portfolioItems,
+    required this.notifications,
+  });
+
+  factory DashboardModel.fromJson(Map<String, dynamic> json) {
+    return DashboardModel(
+      portfolioValue: json['portfolioValue'],
+      activeTrades: json['activeTrades'],
+      totalProfit: json['totalProfit'],
+      totalLoss: json['totalLoss'],
+      recentTrades: (json['recentTrades'] as List)
+          .map((i) => CoreTrade.fromJson(i))
+          .toList(),
+      portfolioItems: (json['portfolioItems'] as List)
+          .map((i) => PortfolioItem.fromJson(i))
+          .toList(),
+      notifications: (json['notifications'] as List)
+          .map((i) => Notification.fromJson(i))
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'portfolioValue': portfolioValue,
+      'activeTrades': activeTrades,
+      'totalProfit': totalProfit,
+      'totalLoss': totalLoss,
+      'recentTrades': recentTrades.map((e) => e.toJson()).toList(),
+      'portfolioItems': portfolioItems.map((e) => e.toJson()).toList(),
+      'notifications': notifications.map((e) => e.toJson()).toList(),
+    };
+  }
+}
+
+class PortfolioItem {
+  final String asset;
+  final double amount;
+  final double value;
+
+  PortfolioItem({
+    required this.asset,
+    required this.amount,
+    required this.value,
+  });
+
+  factory PortfolioItem.fromJson(Map<String, dynamic> json) {
+    return PortfolioItem(
+      asset: json['asset'],
+      amount: json['amount'],
+      value: json['value'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'asset': asset,
+      'amount': amount,
+      'value': value,
+    };
+  }
+}
+
+class Notification {
+  final String id;
+  final String title;
+  final String message;
+  final DateTime timestamp;
+
+  Notification({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.timestamp,
+  });
+
+  factory Notification.fromJson(Map<String, dynamic> json) {
+    return Notification(
+      id: json['id'],
+      title: json['title'],
+      message: json['message'],
+      timestamp: DateTime.parse(json['timestamp']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'message': message,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
+}
+```
+
+./lib/features/portfolio/ui/widgets/asset_list.dart:
+```
+// lib/features/portfolio/ui/widgets/asset_list.dart
+
+import 'package:flutter/material.dart';
+
+class AssetList extends StatelessWidget {
+  final Map<String, double> assets;
+
+  const AssetList({super.key, required this.assets});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Assets',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            ...assets.entries
+                .map((entry) => _buildAssetItem(entry.key, entry.value))
+                ,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssetItem(String asset, double amount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(asset),
+          Text(amount.toStringAsFixed(8)),
+        ],
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/portfolio/ui/widgets/portfolio_summary.dart:
+```
+// lib/features/portfolio/ui/widgets/portfolio_summary.dart
+
+import 'package:flutter/material.dart';
+
+class PortfolioSummary extends StatelessWidget {
+  final double totalValue;
+
+  const PortfolioSummary({super.key, required this.totalValue});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Portfolio Summary',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Total Value: \$${totalValue.toStringAsFixed(2)}',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/portfolio/ui/widgets/portfolio_chart.dart:
+```
+// lib/features/portfolio/ui/widgets/portfolio_chart.dart
+
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+
+class PortfolioChart extends StatelessWidget {
+  final List<Map<String, dynamic>> chartData;
+
+  const PortfolioChart({super.key, required this.chartData});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Portfolio Performance',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  gridData: const FlGridData(show: false),
+                  titlesData: const FlTitlesData(show: false),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: chartData
+                          .asMap()
+                          .entries
+                          .map((entry) => FlSpot(
+                              entry.key.toDouble(), entry.value['value']))
+                          .toList(),
+                      isCurved: true,
+                      color: Theme.of(context).primaryColor,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                          show: true,
+                          color:
+                              Theme.of(context).primaryColor.withOpacity(0.3)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/features/portfolio/ui/pages/portfolio_page.dart:
+```
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_bloc.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_event.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_state.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/ui/widgets/asset_list.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/ui/widgets/portfolio_summary.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/ui/widgets/portfolio_chart.dart';
+
+class PortfolioPage extends StatelessWidget {
+  const PortfolioPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<PortfolioBloc, PortfolioState>(
+      listener: (context, state) {
+        if (state is PortfolioError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is PortfolioInitial) {
+          context.read<PortfolioBloc>().add(LoadPortfolio());
+          return const LoadingIndicator(message: 'Loading portfolio...');
+        } else if (state is PortfolioLoading) {
+          return const LoadingIndicator(message: 'Updating portfolio...');
+        } else if (state is PortfolioLoaded) {
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CustomCard(
+                    child: PortfolioSummary(
+                        totalValue: state.portfolio.totalValue),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomCard(
+                    child: PortfolioChart(chartData: state.performanceData),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomCard(
+                    child: AssetList(assets: state.portfolio.assets),
+                  ),
+                ],
+              ),
+            ),
+          );
+        } else if (state is PortfolioError) {
+          return ErrorMessage(message: state.message);
+        }
+        return const ErrorMessage(message: 'Unknown state');
+      },
+    );
+  }
+}
+
+```
+
+./lib/features/portfolio/blocs/portfolio_bloc.dart:
+```
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_event.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_state.dart';
+import 'package:cost_averaging_trading_app/features/portfolio/repositories/portfolio_repository.dart';
+
+class PortfolioBloc extends Bloc<PortfolioEvent, PortfolioState> {
+  final PortfolioRepository _repository;
+
+  PortfolioBloc(this._repository) : super(PortfolioInitial()) {
+    on<LoadPortfolio>(_onLoadPortfolio);
+  }
+
+  Future<void> _onLoadPortfolio(
+    LoadPortfolio event,
+    Emitter<PortfolioState> emit,
+  ) async {
+    emit(PortfolioLoading());
+    try {
+      final portfolio = await _repository.getPortfolio();
+      final performanceData = await _repository.getPerformanceData();
+      emit(PortfolioLoaded(
+          portfolio: portfolio, performanceData: performanceData));
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error loading portfolio data', e, stackTrace);
+      emit(PortfolioError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+    }
+  }
+}
+
+```
+
+./lib/features/portfolio/blocs/portfolio_state.dart:
+```
+// lib/features/portfolio/blocs/portfolio_state.dart
+
+import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
+import 'package:equatable/equatable.dart';
+
+abstract class PortfolioState extends Equatable {
+  const PortfolioState();
+
+  @override
+  List<Object> get props => [];
+}
+
+class PortfolioInitial extends PortfolioState {}
+
+class PortfolioLoading extends PortfolioState {}
+
+class PortfolioLoaded extends PortfolioState {
+  final Portfolio portfolio;
+  final List<Map<String, dynamic>> performanceData;
+
+  const PortfolioLoaded({
+    required this.portfolio,
+    required this.performanceData,
+  });
+
+  @override
+  List<Object> get props => [portfolio, performanceData];
+}
+
+class PortfolioError extends PortfolioState {
+  final String message;
+
+  const PortfolioError(this.message);
+
+  @override
+  List<Object> get props => [message];
+}
+
+```
+
+./lib/features/portfolio/blocs/portfolio_event.dart:
+```
+// lib/features/portfolio/blocs/portfolio_event.dart
+
+import 'package:equatable/equatable.dart';
+
+abstract class PortfolioEvent extends Equatable {
+  const PortfolioEvent();
+
+  @override
+  List<Object> get props => [];
+}
+
+class LoadPortfolio extends PortfolioEvent {}
+
+```
+
+./lib/features/portfolio/repositories/portfolio_repository.dart:
+```
+// lib/features/portfolio/repositories/portfolio_repository.dart
+
+import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+
+class PortfolioRepository {
+  final ApiService apiService;
+  final DatabaseService databaseService;
+
+  PortfolioRepository(
+      {required this.apiService, required this.databaseService});
+
+  Future<Portfolio> getPortfolio() async {
+    // Implementa la logica per ottenere il portfolio
+    // Usa apiService o databaseService a seconda delle necessità
+    // Per ora, restituiamo dati di esempio
+    return const Portfolio(
+      id: '1',
+      assets: {'BTC': 0.5, 'ETH': 2.0, 'USDT': 1000.0},
+      totalValue: 10000.0,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getPerformanceData() async {
+    // Implementa la logica per ottenere i dati di performance
+    // Usa apiService o databaseService a seconda delle necessità
+    // Per ora, restituiamo dati di esempio
+    return [
+      {
+        'date': DateTime.now().subtract(const Duration(days: 30)),
+        'value': 9000.0
+      },
+      {
+        'date': DateTime.now().subtract(const Duration(days: 20)),
+        'value': 9500.0
+      },
+      {
+        'date': DateTime.now().subtract(const Duration(days: 10)),
+        'value': 9800.0
+      },
+      {'date': DateTime.now(), 'value': 10000.0},
+    ];
+  }
+}
+
+```
+
+./lib/features/portfolio/models/portfolio_model.dart:
+```
+class PortfolioModel {
+  final Map<String, double> assets;
+  final List<Transaction> transactions;
+
+  PortfolioModel({
+    required this.assets,
+    required this.transactions,
+  });
+}
+
+class Transaction {
+  final String id;
+  final String assetSymbol;
+  final double amount;
+  final double price;
+  final DateTime timestamp;
+
+  Transaction({
+    required this.id,
+    required this.assetSymbol,
+    required this.amount,
+    required this.price,
+    required this.timestamp,
+  });
+}
+```
+
+./lib/core/widgets/shared_widgets.dart:
+```
+import 'package:flutter/material.dart';
+
+class CustomCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double elevation;
+
+  const CustomCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(16.0),
+    this.elevation = 2.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: elevation,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: padding,
+        child: child,
+      ),
+    );
+  }
+}
+
+class ErrorMessage extends StatelessWidget {
+  final String message;
+
+  const ErrorMessage({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: CustomCard(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: Theme.of(context).textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class LoadingIndicator extends StatelessWidget {
+  final String message;
+
+  const LoadingIndicator({super.key, this.message = 'Loading...'});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+```
+
+./lib/core/dtos/portfolio_dto.dart:
+```
+import 'dart:convert';
+
+class PortfolioDTO {
+  final String id;
+  final Map<String, double> assets;
+  final double totalValue;
+
+  PortfolioDTO({
+    required this.id,
+    required this.assets,
+    required this.totalValue,
+  });
+
+  factory PortfolioDTO.fromJson(Map<String, dynamic> json) {
+    return PortfolioDTO(
+      id: json['id'],
+      assets: Map<String, double>.from(json['assets']),
+      totalValue: json['totalValue'].toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'assets': assets,
+      'totalValue': totalValue,
+    };
+  }
+
+  factory PortfolioDTO.fromDatabase(Map<String, dynamic> data) {
+    return PortfolioDTO(
+      id: data['id'],
+      assets: Map<String, double>.from(json.decode(data['assets'])),
+      totalValue: data['totalValue'],
+    );
+  }
+
+  Map<String, dynamic> toDatabase() {
+    return {
+      'id': id,
+      'assets': json.encode(assets),
+      'totalValue': totalValue,
+    };
+  }
+}
+
+```
+
+./lib/core/dtos/trade_dto.dart:
+```
+class TradeDTO {
+  final String id;
+  final String symbol;
+  final double amount;
+  final double price;
+  final DateTime timestamp;
+  final String type;
+
+  TradeDTO({
+    required this.id,
+    required this.symbol,
+    required this.amount,
+    required this.price,
+    required this.timestamp,
+    required this.type,
+  });
+
+  factory TradeDTO.fromJson(Map<String, dynamic> json) {
+    return TradeDTO(
+      id: json['id'],
+      symbol: json['symbol'],
+      amount: json['amount'],
+      price: json['price'],
+      timestamp: DateTime.parse(json['timestamp']),
+      type: json['type'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'symbol': symbol,
+      'amount': amount,
+      'price': price,
+      'timestamp': timestamp.toIso8601String(),
+      'type': type,
+    };
+  }
+}
+
+```
+
+./lib/core/theme/app_theme.dart:
+```
+import 'package:flutter/material.dart';
+
+class AppTheme {
+  static ThemeData get lightTheme {
+    return ThemeData(
+      primarySwatch: Colors.blue,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: Colors.white,
+      appBarTheme: const AppBarTheme(
+        color: Colors.blue,
+        elevation: 0,
+        iconTheme: IconThemeData(color: Colors.white),
+      ),
+      cardTheme: CardTheme(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      buttonTheme: ButtonThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        buttonColor: Colors.blue,
+      ),
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(
+            fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+        displayMedium: TextStyle(
+            fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
+        displaySmall: TextStyle(
+            fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+        headlineMedium: TextStyle(
+            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+        headlineSmall: TextStyle(
+            fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+        titleLarge: TextStyle(
+            fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+        bodyLarge: TextStyle(fontSize: 16, color: Colors.black87),
+        bodyMedium: TextStyle(fontSize: 14, color: Colors.black87),
+      ),
+    );
+  }
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      primarySwatch: Colors.blue,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: Colors.grey[900],
+      appBarTheme: AppBarTheme(
+        color: Colors.grey[800],
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      cardTheme: CardTheme(
+        color: Colors.grey[800],
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      buttonTheme: ButtonThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        buttonColor: Colors.blue,
+      ),
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(
+            fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+        displayMedium: TextStyle(
+            fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+        displaySmall: TextStyle(
+            fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+        headlineMedium: TextStyle(
+            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+        headlineSmall: TextStyle(
+            fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        titleLarge: TextStyle(
+            fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+        bodyLarge: TextStyle(fontSize: 16, color: Colors.white70),
+        bodyMedium: TextStyle(fontSize: 14, color: Colors.white70),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/core/domain/enums/trading_enums.dart:
+```
+enum TradeType { buy, sell }
+
+enum OrderType { market, limit, stopLoss, takeProfit }
+
+enum TradingMode { demo, live }
+
+enum TimeFrame { m1, m5, m15, m30, h1, h4, d1, w1, mn1 }
+
+```
+
+./lib/core/domain/entities/trade_entity.dart:
+```
+import 'package:equatable/equatable.dart';
+
+enum TradeType { buy, sell }
+
+class TradeEntity extends Equatable {
+  final String id;
+  final String symbol;
+  final double amount;
+  final double price;
+  final DateTime timestamp;
+  final TradeType type;
+
+  const TradeEntity({
+    required this.id,
+    required this.symbol,
+    required this.amount,
+    required this.price,
+    required this.timestamp,
+    required this.type,
+  });
+
+  @override
+  List<Object?> get props => [id, symbol, amount, price, timestamp, type];
+}
+```
+
+./lib/core/domain/entities/portfolio_entity.dart:
+```
+import 'package:equatable/equatable.dart';
+
+class PortfolioEntity extends Equatable {
+  final String id;
+  final Map<String, double> assets;
+  final double totalValue;
+
+  const PortfolioEntity({
+    required this.id,
+    required this.assets,
+    required this.totalValue,
+  });
+
+  @override
+  List<Object?> get props => [id, assets, totalValue];
+}
+```
+
+./lib/core/mappers/trade_mapper.dart:
+```
+import 'package:cost_averaging_trading_app/core/dtos/trade_dto.dart';
+import 'package:cost_averaging_trading_app/core/domain/entities/trade_entity.dart';
+
+class TradeMapper {
+  static TradeEntity fromDTO(TradeDTO dto) {
+    return TradeEntity(
+      id: dto.id,
+      symbol: dto.symbol,
+      amount: dto.amount,
+      price: dto.price,
+      timestamp: dto.timestamp,
+      type: TradeType.values
+          .firstWhere((e) => e.toString().split('.').last == dto.type),
+    );
+  }
+
+  static TradeDTO toDTO(TradeEntity entity) {
+    return TradeDTO(
+      id: entity.id,
+      symbol: entity.symbol,
+      amount: entity.amount,
+      price: entity.price,
+      timestamp: entity.timestamp,
+      type: entity.type.toString().split('.').last,
+    );
+  }
+}
+
+```
+
+./lib/core/mappers/portfolio_mapper.dart:
+```
+import 'package:cost_averaging_trading_app/core/dtos/portfolio_dto.dart';
+import 'package:cost_averaging_trading_app/core/domain/entities/portfolio_entity.dart';
+
+class PortfolioMapper {
+  static PortfolioEntity fromDTO(PortfolioDTO dto) {
+    return PortfolioEntity(
+      id: dto.id,
+      assets: dto.assets,
+      totalValue: dto.totalValue,
+    );
+  }
+
+  static PortfolioDTO toDTO(PortfolioEntity entity) {
+    return PortfolioDTO(
+      id: entity.id,
+      assets: entity.assets,
+      totalValue: entity.totalValue,
+    );
+  }
+}
+
+```
+
+./lib/core/animations/custom_animations.dart:
+```
+import 'package:flutter/material.dart';
+
+class FadeInAnimation extends StatefulWidget {
+  final Widget child;
+  final Duration duration;
+
+  const FadeInAnimation({
+    super.key,
+    required this.child,
+    this.duration = const Duration(milliseconds: 500),
+  });
+
+  @override
+  FadeInAnimationState createState() => FadeInAnimationState();
+}
+
+class FadeInAnimationState extends State<FadeInAnimation>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _animation,
+      child: widget.child,
+    );
+  }
+}
+
+class SlideInAnimation extends StatefulWidget {
+  final Widget child;
+  final Duration duration;
+  final Offset beginOffset;
+
+  const SlideInAnimation({
+    super.key,
+    required this.child,
+    this.duration = const Duration(milliseconds: 500),
+    this.beginOffset = const Offset(0.0, 0.35),
+  });
+
+  @override
+  SlideInAnimationState createState() => SlideInAnimationState();
+}
+
+class SlideInAnimationState extends State<SlideInAnimation>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    _animation =
+        Tween<Offset>(begin: widget.beginOffset, end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _animation,
+      child: widget.child,
+    );
+  }
+}
+
+```
+
+./lib/core/services/risk_management_service.dart:
+```
+import 'dart:math';
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:cost_averaging_trading_app/features/settings/models/settings_model.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+import 'package:flutter/foundation.dart';
+
+class RiskManagementService {
+  final SettingsModel settings;
+  final ApiService apiService;
+  final DatabaseService databaseService;
+
+  RiskManagementService(this.settings, this.apiService, this.databaseService);
+
+  Future<bool> isCoreTradeAllowed(
+      CoreTrade proposedCoreTrade, double currentPortfolioValue) async {
+    try {
+      if (!await _isWithinVolatilityLimits(proposedCoreTrade)) {
+        if (kDebugMode) {
+          print('Trade non consentito: supera i limiti di volatilità');
+        }
+        return false;
+      }
+
+      if (!await _isWithinMaxRebuyLimit(proposedCoreTrade)) {
+        if (kDebugMode) {
+          print('Trade non consentito: supera il limite massimo di riacquisti');
+        }
+        return false;
+      }
+
+      if (!_isAboveStopLoss(proposedCoreTrade, currentPortfolioValue)) {
+        if (kDebugMode) {
+          print('Trade non consentito: viola lo stop loss');
+        }
+        return false;
+      }
+
+      if (!_isWithinMaxPositionSize(proposedCoreTrade, currentPortfolioValue)) {
+        if (kDebugMode) {
+          print(
+              'Trade non consentito: supera la dimensione massima della posizione');
+        }
+        return false;
+      }
+
+      if (!await _isWithinDailyExposureLimit(proposedCoreTrade)) {
+        if (kDebugMode) {
+          print(
+              'Trade non consentito: supera il limite di esposizione giornaliera');
+        }
+        return false;
+      }
+
+      return true;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error in isCoreTradeAllowed', e, stackTrace);
+      return false;
+    }
+  }
+
+  Future<bool> _isWithinVolatilityLimits(CoreTrade trade) async {
+    try {
+      double volatility = await _calculateVolatility(trade.symbol);
+      return volatility <= settings.maxAllowedVolatility;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+          'Error in _isWithinVolatilityLimits', e, stackTrace);
+      return false;
+    }
+  }
+
+  Future<bool> _isWithinMaxRebuyLimit(CoreTrade trade) async {
+    try {
+      int rebuyCount = await _getRebuyCount(trade.symbol);
+      return rebuyCount < settings.maxRebuyCount;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error in _isWithinMaxRebuyLimit', e, stackTrace);
+      return false;
+    }
+  }
+
+  bool _isAboveStopLoss(CoreTrade trade, double currentPortfolioValue) {
+    double potentialLoss =
+        (currentPortfolioValue - (trade.amount * trade.price)) /
+            currentPortfolioValue;
+    return potentialLoss <= settings.maxLossPercentage;
+  }
+
+  bool _isWithinMaxPositionSize(CoreTrade trade, double currentPortfolioValue) {
+    double tradeValue = trade.amount * trade.price;
+    double maxPositionSize =
+        currentPortfolioValue * settings.maxPositionSizePercentage;
+    return tradeValue <= maxPositionSize;
+  }
+
+  Future<bool> _isWithinDailyExposureLimit(CoreTrade trade) async {
+    try {
+      double dailyExposure = await _calculateDailyExposure(trade.symbol);
+      return dailyExposure + (trade.amount * trade.price) <=
+          settings.dailyExposureLimit;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+          'Error in _isWithinDailyExposureLimit', e, stackTrace);
+      return false;
+    }
+  }
+
+  Future<double> _calculateVolatility(String symbol) async {
+    try {
+      var klineData = await apiService.getKlines(
+        symbol: symbol,
+        interval: '1d',
+        limit: 30,
+      );
+
+      List<double> closePrices =
+          klineData.map<double>((k) => double.parse(k['4'])).toList();
+
+      List<double> logReturns = [];
+      for (int i = 1; i < closePrices.length; i++) {
+        logReturns.add(log(closePrices[i] / closePrices[i - 1]));
+      }
+
+      double mean = logReturns.reduce((a, b) => a + b) / logReturns.length;
+      double variance =
+          logReturns.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
+              logReturns.length;
+      double stdDev = sqrt(variance);
+
+      return stdDev * sqrt(365);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error in _calculateVolatility', e, stackTrace);
+      return double.infinity;
+    }
+  }
+
+  Future<int> _getRebuyCount(String symbol) async {
+    try {
+      var sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+      var recentTrades =
+          await databaseService.getRecentTrades(symbol, sevenDaysAgo);
+      return recentTrades.where((trade) => trade['type'] == 'buy').length;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error in _getRebuyCount', e, stackTrace);
+      return settings.maxRebuyCount;
+    }
+  }
+
+  Future<double> _calculateDailyExposure(String symbol) async {
+    try {
+      var todayTrades = await databaseService.getTodayTrades(symbol);
+      double totalExposure = 0.0;
+      for (var trade in todayTrades) {
+        totalExposure += trade['amount'] * trade['price'];
+      }
+      return totalExposure;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Error in _calculateDailyExposure', e, stackTrace);
+      return settings.dailyExposureLimit;
+    }
+  }
+}
+
+```
+
+./lib/core/services/backtesting_service.dart:
+```
+import 'dart:math';
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+
+class BacktestingService {
+  final ApiService apiService;
+
+  BacktestingService(this.apiService);
+
+  Future<BacktestResult> runBacktest(String symbol, DateTime startDate,
+      DateTime endDate, StrategyParameters strategyParameters) async {
+    final historicalData = await _getHistoricalData(symbol, startDate, endDate);
+    final trades = _simulateTrading(historicalData, strategyParameters);
+    final performance = _calculatePerformance(trades, historicalData);
+    return BacktestResult(trades: trades, performance: performance);
+  }
+
+  Future<List<HistoricalDataPoint>> _getHistoricalData(
+      String symbol, DateTime startDate, DateTime endDate) async {
+    final response = await apiService.getKlines(
+      symbol: symbol,
+      interval: '1d',
+      startTime: startDate.millisecondsSinceEpoch,
+      endTime: endDate.millisecondsSinceEpoch,
+    );
+
+    return response
+        .map((data) => HistoricalDataPoint(
+              timestamp: DateTime.fromMillisecondsSinceEpoch(data['0']),
+              open: double.parse(data['1']),
+              high: double.parse(data['2']),
+              low: double.parse(data['3']),
+              close: double.parse(data['4']),
+              volume: double.parse(data['5']),
+            ))
+        .toList();
+  }
+
+  List<CoreTrade> _simulateTrading(
+      List<HistoricalDataPoint> historicalData, StrategyParameters params) {
+    List<CoreTrade> trades = [];
+    double portfolioValue = params.investmentAmount;
+    double btcAmount = 0;
+
+    for (int i = 0; i < historicalData.length; i++) {
+      final currentPrice = historicalData[i].close;
+
+      // Implementa la logica di trading qui
+      if (i % params.intervalDays == 0) {
+        // Esegui un acquisto
+        double amountToSpend = min(params.investmentAmount, portfolioValue);
+        double btcToBuy = amountToSpend / currentPrice;
+
+        trades.add(CoreTrade(
+          id: i.toString(),
+          symbol: params.symbol,
+          amount: btcToBuy,
+          price: currentPrice,
+          timestamp: historicalData[i].timestamp,
+          type: CoreTradeType.buy,
+        ));
+
+        portfolioValue -= amountToSpend;
+        btcAmount += btcToBuy;
+      }
+
+      // Controlla se è necessario vendere
+      if (currentPrice >= params.targetProfitPercentage * trades.last.price) {
+        trades.add(CoreTrade(
+          id: (i + 1000000)
+              .toString(), // Per evitare conflitti con gli ID di acquisto
+          symbol: params.symbol,
+          amount: btcAmount,
+          price: currentPrice,
+          timestamp: historicalData[i].timestamp,
+          type: CoreTradeType.sell,
+        ));
+
+        portfolioValue += btcAmount * currentPrice;
+        btcAmount = 0;
+      }
+    }
+
+    return trades;
+  }
+
+  BacktestPerformance _calculatePerformance(
+      List<CoreTrade> trades, List<HistoricalDataPoint> historicalData) {
+    double totalProfit = 0;
+    int winningTrades = 0;
+    double maxDrawdown = 0;
+    double peakValue = 0;
+    double currentDrawdown = 0;
+
+    for (int i = 0; i < trades.length; i++) {
+      if (trades[i].type == CoreTradeType.sell) {
+        double buyPrice = trades[i - 1].price;
+        double sellPrice = trades[i].price;
+        double profit = (sellPrice - buyPrice) * trades[i].amount;
+
+        totalProfit += profit;
+        if (profit > 0) winningTrades++;
+
+        if (totalProfit > peakValue) {
+          peakValue = totalProfit;
+          currentDrawdown = 0;
+        } else {
+          currentDrawdown = peakValue - totalProfit;
+          if (currentDrawdown > maxDrawdown) {
+            maxDrawdown = currentDrawdown;
+          }
+        }
+      }
+    }
+
+    double winRate = trades.isEmpty ? 0 : winningTrades / (trades.length / 2);
+    double sharpeRatio = _calculateSharpeRatio(trades, historicalData);
+
+    return BacktestPerformance(
+      totalProfit: totalProfit,
+      winRate: winRate,
+      maxDrawdown: maxDrawdown,
+      sharpeRatio: sharpeRatio,
+    );
+  }
+
+  double _calculateSharpeRatio(
+      List<CoreTrade> trades, List<HistoricalDataPoint> historicalData) {
+    List<double> returns = [];
+    for (int i = 1; i < trades.length; i += 2) {
+      double buyPrice = trades[i - 1].price;
+      double sellPrice = trades[i].price;
+      returns.add((sellPrice - buyPrice) / buyPrice);
+    }
+
+    double averageReturn = returns.reduce((a, b) => a + b) / returns.length;
+    double standardDeviation = sqrt(
+        returns.map((r) => pow(r - averageReturn, 2)).reduce((a, b) => a + b) /
+            returns.length);
+
+    // Assumiamo un tasso di interesse privo di rischio dello 0% per semplicità
+    return averageReturn /
+        standardDeviation *
+        sqrt(
+            252); // 252 è il numero approssimativo di giorni di trading in un anno
+  }
+}
+
+class BacktestResult {
+  final List<CoreTrade> trades;
+  final BacktestPerformance performance;
+
+  BacktestResult({required this.trades, required this.performance});
+}
+
+class BacktestPerformance {
+  final double totalProfit;
+  final double winRate;
+  final double maxDrawdown;
+  final double sharpeRatio;
+
+  BacktestPerformance({
+    required this.totalProfit,
+    required this.winRate,
+    required this.maxDrawdown,
+    required this.sharpeRatio,
+  });
+}
+
+class HistoricalDataPoint {
+  final DateTime timestamp;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  final double volume;
+
+  HistoricalDataPoint({
+    required this.timestamp,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.volume,
+  });
+}
+
+```
+
+./lib/core/services/api_service.dart:
+```
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:crypto/crypto.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+
+class ApiService {
+  final String apiKey;
+  final String secretKey;
+  final String baseUrl = 'https://api.binance.com';
+
+  ApiService({required this.apiKey, required this.secretKey});
+
+  Future<dynamic> get(String endpoint,
+      {Map<String, dynamic>? queryParams}) async {
+    try {
+      final uri =
+          Uri.parse('$baseUrl$endpoint').replace(queryParameters: queryParams);
+      final response = await http.get(
+        uri,
+        headers: _getHeaders(),
+      );
+      return _handleResponse(response);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('GET request failed: $endpoint', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
+    try {
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      body['timestamp'] = timestamp.toString();
+      body['signature'] = _generateSignature(body);
+
+      final response = await http.post(
+        uri,
+        headers: _getHeaders(),
+        body: body,
+      );
+      return _handleResponse(response);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('POST request failed: $endpoint', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  Map<String, String> _getHeaders() {
+    return {
+      'X-MBX-APIKEY': apiKey,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+  }
+
+  String _generateSignature(Map<String, dynamic> params) {
+    final queryString = Uri(queryParameters: params).query;
+    final hmac = Hmac(sha256, utf8.encode(secretKey));
+    return hmac.convert(utf8.encode(queryString)).toString();
+  }
+
+  dynamic _handleResponse(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return json.decode(response.body);
+    } else {
+      throw Exception(
+          'HTTP error ${response.statusCode}: ${response.reasonPhrase}');
+    }
+  }
+
+  // Chiamate API specifiche
+
+  Future<dynamic> getAccountInfo() async {
+    try {
+      return await get('/api/v3/account');
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get account info', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<dynamic> createOrder({
+    required String symbol,
+    required String side,
+    required String type,
+    required String quantity,
+    String? price,
+    String? stopPrice,
+  }) async {
+    try {
+      final body = {
+        'symbol': symbol,
+        'side': side,
+        'type': type,
+        'quantity': quantity,
+        if (price != null) 'price': price,
+        if (stopPrice != null) 'stopPrice': stopPrice,
+      };
+      return await post('/api/v3/order', body);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to create order', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<dynamic> cancelOrder({
+    required String symbol,
+    String? orderId,
+    String? origClientOrderId,
+  }) async {
+    final body = {
+      'symbol': symbol,
+      if (orderId != null) 'orderId': orderId,
+      if (origClientOrderId != null) 'origClientOrderId': origClientOrderId,
+    };
+    return await post('/api/v3/order', body);
+  }
+
+  Future<dynamic> getOpenOrders({String? symbol}) async {
+    final queryParams = symbol != null ? {'symbol': symbol} : null;
+    return await get('/api/v3/openOrders', queryParams: queryParams);
+  }
+
+  Future<dynamic> getAllOrders({required String symbol}) async {
+    return await get('/api/v3/allOrders', queryParams: {'symbol': symbol});
+  }
+
+  Future<dynamic> getExchangeInfo() async {
+    return await get('/api/v3/exchangeInfo');
+  }
+
+  Future<List<Map<String, dynamic>>> getKlines({
+    required String symbol,
+    required String interval,
+    int? limit,
+    int? startTime,
+    int? endTime,
+  }) async {
+    try {
+      final queryParams = {
+        'symbol': symbol,
+        'interval': interval,
+        if (limit != null) 'limit': limit.toString(),
+        if (startTime != null) 'startTime': startTime.toString(),
+        if (endTime != null) 'endTime': endTime.toString(),
+      };
+      final response = await get('/api/v3/klines', queryParams: queryParams);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get klines', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> get24hrTickerPriceChange(String symbol) async {
+    try {
+      return await get('/api/v3/ticker/24hr', queryParams: {'symbol': symbol});
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+          'Failed to get 24hr ticker price change', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  // Aggiungi questo nuovo metodo per ottenere il prezzo attuale
+  Future<double> getCurrentPrice(String symbol) async {
+    try {
+      final response =
+          await get('/api/v3/ticker/price', queryParams: {'symbol': symbol});
+      return double.parse(response['price']);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get current price', e, stackTrace);
+      rethrow;
+    }
+  }
+}
+
+```
+
+./lib/core/services/trading_service.dart:
+```
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+import 'package:cost_averaging_trading_app/core/services/risk_management_service.dart';
+import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+
+class TradingService {
+  final ApiService _apiService;
+  final DatabaseService _databaseService;
+  final RiskManagementService _riskManagementService;
+  bool _isDemoMode = false;
+
+  TradingService(
+      this._apiService, this._databaseService, this._riskManagementService);
+
+  void setDemoMode(bool isDemoMode) {
+    _isDemoMode = isDemoMode;
+  }
+
+  Future<void> executeTrade(CoreTrade trade) async {
+    try {
+      if (_isDemoMode) {
+        await _executeDemoTrade(trade);
+      } else {
+        await _executeLiveTrade(trade);
+      }
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to execute trade', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<void> _executeDemoTrade(CoreTrade trade) async {
+    try {
+      // Otteniamo il prezzo corrente reale da Binance
+      double currentPrice = await _apiService.getCurrentPrice(trade.symbol);
+      
+      // Aggiorna il prezzo del trade con il prezzo reale
+      trade = trade.copyWith(price: currentPrice);
+
+      await _databaseService.insert('trades', trade.toJson());
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to execute demo trade', e, stackTrace);
+      throw Exception('Errore nell\'esecuzione del trade in modalità demo');
+    }
+  }
+
+  Future<void> _executeLiveTrade(CoreTrade trade) async {
+    try {
+      await _apiService.createOrder(
+        symbol: trade.symbol,
+        side: trade.type == CoreTradeType.buy ? 'BUY' : 'SELL',
+        type: 'MARKET',
+        quantity: trade.amount.toString(),
+      );
+      await _databaseService.insert('trades', trade.toJson());
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to execute live trade', e, stackTrace);
+      throw Exception('Errore nell\'esecuzione del trade in modalità live');
+    }
+  }
+
+  Future<void> executeStrategy(StrategyParameters params) async {
+    try {
+      final lastPurchaseDate = await _getLastPurchaseDate(params.symbol);
+      final now = DateTime.now();
+      if (lastPurchaseDate != null &&
+          now.difference(lastPurchaseDate).inDays < params.purchaseFrequency) {
+        return;
+      }
+
+      double currentPrice = await _apiService.getCurrentPrice(params.symbol);
+      double amountToBuy = params.investmentAmount / currentPrice;
+      amountToBuy = amountToBuy.clamp(0, params.maxInvestmentSize);
+
+      bool isTradeAllowed = await _riskManagementService.isCoreTradeAllowed(
+        CoreTrade(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          symbol: params.symbol,
+          amount: amountToBuy,
+          price: currentPrice,
+          timestamp: now,
+          type: CoreTradeType.buy,
+        ),
+        await _getCurrentPortfolioValue(),
+      );
+
+      if (!isTradeAllowed) {
+        throw Exception('Trade non consentito: supera i limiti di rischio');
+      }
+
+      CoreTrade trade = CoreTrade(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        symbol: params.symbol,
+        amount: amountToBuy,
+        price: currentPrice,
+        timestamp: now,
+        type: CoreTradeType.buy,
+      );
+
+      await executeTrade(trade);
+      await _checkAndExecuteTakeProfit(params);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to execute strategy', e, stackTrace);
+      throw Exception('Errore nell\'esecuzione della strategia di trading');
+    }
+  }
+  Future<DateTime?> _getLastPurchaseDate(String symbol) async {
+    // Implementa la logica per ottenere la data dell'ultimo acquisto dal database
+    // Questo è un esempio, dovresti adattarlo alla tua implementazione del database
+    final lastTrade = await _databaseService.getLastTrade(symbol);
+    return lastTrade?.timestamp;
+  }
+
+  Future<void> _checkAndExecuteTakeProfit(StrategyParameters params) async {
+    // Otteniamo tutti i trade per il simbolo specificato
+    List<Map<String, dynamic>> tradeData = await _databaseService.query(
+      'trades',
+    );
+
+    // Convertiamo i dati del database in oggetti CoreTrade
+    List<CoreTrade> trades =
+        tradeData.map((data) => CoreTrade.fromJson(data)).toList();
+
+    if (trades.isEmpty) return;
+
+    // Calcoliamo il prezzo medio di acquisto
+    double totalAmount = 0;
+    double totalValue = 0;
+    for (var trade in trades) {
+      if (trade.type == CoreTradeType.buy) {
+        totalAmount += trade.amount;
+        totalValue += trade.amount * trade.price;
+      }
+    }
+    double averagePrice = totalValue / totalAmount;
+
+    // Otteniamo il prezzo corrente
+    double currentPrice = await _getCurrentPrice(params.symbol);
+
+    // Verifichiamo se il prezzo corrente ha raggiunto il target di profitto
+    if (currentPrice >= averagePrice * (1 + params.targetProfitPercentage)) {
+      // Eseguiamo la vendita di tutto il paniere
+      CoreTrade sellTrade = CoreTrade(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        symbol: params.symbol,
+        amount: totalAmount,
+        price: currentPrice,
+        timestamp: DateTime.now(),
+        type: CoreTradeType.sell,
+      );
+
+      await executeTrade(sellTrade);
+    }
+  }
+
+  Future<double> _getCurrentPrice(String symbol) async {
+    try {
+      final response = await _apiService.get24hrTickerPriceChange(symbol);
+      return double.parse(response['lastPrice']);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get current price', e, stackTrace);
+      throw Exception('Errore nel recupero del prezzo corrente');
+    }
+  }
+
+  Future<double> _getCurrentPortfolioValue() async {
+    try {
+      // Implementa la logica per calcolare il valore corrente del portafoglio
+      return 0.0; // Placeholder
+    } catch (e, stackTrace) {
+      ErrorHandler.logError(
+          'Failed to get current portfolio value', e, stackTrace);
+      throw Exception('Errore nel calcolo del valore del portafoglio');
+    }
+  }
+}
+
+```
+
+./lib/core/services/secure_storage_service.dart:
+```
+// lib/core/services/secure_storage_service.dart
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+class SecureStorageService {
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  Future<void> saveApiKey(String apiKey) async {
+    await _storage.write(key: 'apiKey', value: apiKey);
+  }
+
+  Future<String?> getApiKey() async {
+    return await _storage.read(key: 'apiKey');
+  }
+
+  Future<void> saveSecretKey(String secretKey) async {
+    await _storage.write(key: 'secretKey', value: secretKey);
+  }
+
+  Future<String?> getSecretKey() async {
+    return await _storage.read(key: 'secretKey');
+  }
+
+  Future<void> saveValue(String key, String value) async {
+    await _storage.write(key: key, value: value);
+  }
+
+  Future<String?> getValue(String key) async {
+    return await _storage.read(key: key);
+  }
+}
+
+```
+
+./lib/core/services/database_service.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:path/path.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+
+class DatabaseService {
+  static Database? _database;
+  static DatabaseService? _instance;
+
+  DatabaseService._();
+
+  static Future<DatabaseService> getInstance() async {
+    if (_instance == null) {
+      _instance = DatabaseService._();
+      await _instance!._initDatabase();
+    }
+    return _instance!;
+  }
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
+  }
+
+  Future<Database> _initDatabase() async {
+    try {
+      if (!kIsWeb) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+
+      String path = join(await getDatabasesPath(), 'cost_averaging_trading.db');
+      return await openDatabase(
+        path,
+        version: 2,
+        onCreate: _createDb,
+        onUpgrade: _upgradeDb,
+      );
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to initialize database', e, stackTrace);
+      throw Exception('Impossibile inizializzare il database');
+    }
+  }
+
+  Future<void> _createDb(Database db, int version) async {
+    try {
+      await db.execute('''
+        CREATE TABLE trades(
+          id TEXT PRIMARY KEY,
+          symbol TEXT,
+          amount REAL,
+          price REAL,
+          timestamp INTEGER
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE portfolio(
+          id TEXT PRIMARY KEY,
+          assets TEXT,
+          totalValue REAL
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE strategy_parameters(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          symbol TEXT,
+          investmentAmount REAL,
+          intervalDays INTEGER,
+          targetProfitPercentage REAL,
+          stopLossPercentage REAL
+        )
+      ''');
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to create database tables', e, stackTrace);
+      throw Exception('Impossibile creare le tabelle del database');
+    }
+  }
+
+  Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
+    try {
+      if (oldVersion < 2) {
+        await db.execute('''
+          CREATE TABLE strategy_parameters(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT,
+            investmentAmount REAL,
+            intervalDays INTEGER,
+            targetProfitPercentage REAL,
+            stopLossPercentage REAL
+          )
+        ''');
+      }
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to upgrade database', e, stackTrace);
+      throw Exception('Impossibile aggiornare il database');
+    }
+  }
+
+  Future<int> insert(String table, Map<String, dynamic> data) async {
+    try {
+      Database db = await database;
+      return await db.insert(table, data,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to insert data into $table', e, stackTrace);
+      throw Exception('Impossibile inserire i dati nella tabella $table');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> query(String table) async {
+    try {
+      Database db = await database;
+      return await db.query(table);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to query $table', e, stackTrace);
+      throw Exception('Impossibile interrogare la tabella $table');
+    }
+  }
+
+  Future<int> update(String table, Map<String, dynamic> data) async {
+    try {
+      Database db = await database;
+      String id = data['id'];
+      return await db.update(table, data, where: 'id = ?', whereArgs: [id]);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to update data in $table', e, stackTrace);
+      throw Exception('Impossibile aggiornare i dati nella tabella $table');
+    }
+  }
+
+  Future<int> delete(String table, String id) async {
+    try {
+      Database db = await database;
+      return await db.delete(table, where: 'id = ?', whereArgs: [id]);
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to delete data from $table', e, stackTrace);
+      throw Exception('Impossibile eliminare i dati dalla tabella $table');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getRecentTrades(
+      String symbol, DateTime since) async {
+    try {
+      Database db = await database;
+      return await db.query(
+        'trades',
+        where: 'symbol = ? AND timestamp > ?',
+        whereArgs: [symbol, since.millisecondsSinceEpoch],
+      );
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get recent trades', e, stackTrace);
+      throw Exception('Impossibile ottenere i trade recenti');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTodayTrades(String symbol) async {
+    try {
+      Database db = await database;
+      var startOfDay = DateTime.now().subtract(Duration(
+          hours: DateTime.now().hour,
+          minutes: DateTime.now().minute,
+          seconds: DateTime.now().second,
+          milliseconds: DateTime.now().millisecond,
+          microseconds: DateTime.now().microsecond));
+      return await db.query(
+        'trades',
+        where: 'symbol = ? AND timestamp > ?',
+        whereArgs: [symbol, startOfDay.millisecondsSinceEpoch],
+      );
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get today\'s trades', e, stackTrace);
+      throw Exception('Impossibile ottenere i trade di oggi');
+    }
+  }
+
+    Future<CoreTrade?> getLastTrade(String symbol) async {
+  Database db = await database;
+  List<Map<String, dynamic>> result = await db.query(
+    'trades',
+    where: 'symbol = ?',
+    whereArgs: [symbol],
+    orderBy: 'timestamp DESC',
+    limit: 1,
+  );
+  
+  if (result.isNotEmpty) {
+    return CoreTrade.fromJson(result.first);
+  }
+  return null;
+}
+
+}
+
+```
+
+./lib/core/repositories/trading_repository.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+
+abstract class TradingRepository {
+  Future<List<CoreTrade>> getTrades();
+  Future<void> executeTrade(CoreTrade trade);
+}
+
+```
+
+./lib/core/repositories/trading_repository_impl.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:cost_averaging_trading_app/core/repositories/trading_repository.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+import 'package:cost_averaging_trading_app/features/settings/models/settings_model.dart';
+
+class TradingRepositoryImpl implements TradingRepository {
+  final ApiService _apiService;
+  final DatabaseService _databaseService;
+  final SettingsModel _settings;
+
+  TradingRepositoryImpl(
+      this._apiService, this._databaseService, this._settings);
+
+  @override
+  Future<List<CoreTrade>> getTrades() async {
+    if (_settings.isDemoMode) {
+      return _getDemoTrades();
+    } else {
+      try {
+        final json = await _apiService.get('trades');
+        final trades = (json['trades'] as List)
+            .map((e) => CoreTrade(
+                  id: e['id'],
+                  symbol: e['symbol'],
+                  amount: e['amount'],
+                  price: e['price'],
+                  timestamp:
+                      DateTime.fromMillisecondsSinceEpoch(e['timestamp']),
+                  type: e['type'],
+                ))
+            .toList();
+        return trades;
+      } catch (e) {
+        // If API call fails, try to get data from local database
+        final data = await _databaseService.query('trades');
+        return data
+            .map((e) => CoreTrade(
+                  id: e['id'],
+                  symbol: e['symbol'],
+                  amount: e['amount'],
+                  price: e['price'],
+                  timestamp: DateTime.fromMillisecondsSinceEpoch(
+                    e['timestamp'],
+                  ),
+                  type: e['type'],
+                ))
+            .toList();
+      }
+    }
+  }
+
+  @override
+  Future<void> executeTrade(CoreTrade trade) async {
+    if (_settings.isDemoMode) {
+      await _executeDemoTrade(trade);
+    } else {
+      try {
+        await _apiService.post('trades', {
+          'symbol': trade.symbol,
+          'amount': trade.amount,
+          'price': trade.price,
+        });
+      } catch (e) {
+        // If API call fails, save to local database
+        await _databaseService.insert('trades', {
+          'id': trade.id,
+          'symbol': trade.symbol,
+          'amount': trade.amount,
+          'price': trade.price,
+          'timestamp': trade.timestamp.millisecondsSinceEpoch,
+        });
+      }
+    }
+  }
+
+  Future<List<CoreTrade>> _getDemoTrades() async {
+    // Recupera le operazioni demo dal database locale
+    final data = await _databaseService.query('demo_trades');
+    return data
+        .map(
+          (e) => CoreTrade(
+            id: e['id'],
+            symbol: e['symbol'],
+            amount: e['amount'],
+            price: e['price'],
+            timestamp: DateTime.fromMillisecondsSinceEpoch(e['timestamp']),
+            type: e['type'],
+          ),
+        )
+        .toList();
+  }
+
+  Future<void> _executeDemoTrade(CoreTrade trade) async {
+    // Salva l'operazione demo nel database locale
+    await _databaseService.insert('demo_trades', {
+      'id': trade.id,
+      'symbol': trade.symbol,
+      'amount': trade.amount,
+      'price': trade.price,
+      'timestamp': trade.timestamp.millisecondsSinceEpoch,
+    });
+  }
+}
+
+```
+
+./lib/core/repositories/portfolio_repository_impl.dart:
+```
+import 'package:cost_averaging_trading_app/core/dtos/portfolio_dto.dart';
+import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
+import 'package:cost_averaging_trading_app/core/repositories/portfolio_repository.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+
+class PortfolioRepositoryImpl implements PortfolioRepository {
+  final ApiService _apiService;
+  final DatabaseService _databaseService;
+
+  PortfolioRepositoryImpl(this._apiService, this._databaseService);
+
+  @override
+  Future<Portfolio> getPortfolio() async {
+    try {
+      final json = await _apiService.get('portfolio');
+      final dto = PortfolioDTO.fromJson(json);
+      return Portfolio(
+        id: dto.id,
+        assets: dto.assets,
+        totalValue: dto.totalValue,
+      );
+    } catch (e) {
+      // If API call fails, try to get data from local database
+      final data = await _databaseService.query('portfolio');
+      if (data.isNotEmpty) {
+        final dto = PortfolioDTO.fromDatabase(data.first);
+        return Portfolio(
+          id: dto.id,
+          assets: dto.assets,
+          totalValue: dto.totalValue,
+        );
+      }
+      throw Exception('Failed to get portfolio data');
+    }
+  }
+
+  @override
+  Future<void> updatePortfolio(Portfolio portfolio) async {
+    final dto = PortfolioDTO(
+      id: portfolio.id,
+      assets: portfolio.assets,
+      totalValue: portfolio.totalValue,
+    );
+    try {
+      await _apiService.post('portfolio', dto.toJson());
+    } catch (e) {
+      // If API call fails, update local database
+      await _databaseService.insert('portfolio', dto.toDatabase());
+    }
+  }
+}
+
+```
+
+./lib/core/repositories/portfolio_repository.dart:
+```
+import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
+
+abstract class PortfolioRepository {
+  Future<Portfolio> getPortfolio();
+  Future<void> updatePortfolio(Portfolio portfolio);
+}
+
+```
+
+./lib/core/models/portfolio.dart:
+```
+// lib/core/models/portfolio.dart
+
+import 'package:equatable/equatable.dart';
+
+class Portfolio extends Equatable {
+  final String id;
+  final Map<String, double> assets;
+  final double totalValue;
+
+  const Portfolio({
+    required this.id,
+    required this.assets,
+    required this.totalValue,
+  });
+
+  @override
+  List<Object?> get props => [id, assets, totalValue];
+
+  factory Portfolio.fromJson(Map<String, dynamic> json) {
+    return Portfolio(
+      id: json['id'],
+      assets: Map<String, double>.from(json['assets']),
+      totalValue: json['totalValue'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'assets': assets,
+      'totalValue': totalValue,
+    };
+  }
+}
+
+```
+
+./lib/core/models/trade.dart:
+```
+// lib/core/models/trade.dart
+
+import 'package:equatable/equatable.dart';
+
+enum CoreTradeType { buy, sell }
+
+class CoreTrade extends Equatable {
+  final String id;
+  final String symbol;
+  final double amount;
+  final double price;
+  final DateTime timestamp;
+  final CoreTradeType type;
+
+  const CoreTrade({
+    required this.id,
+    required this.symbol,
+    required this.amount,
+    required this.price,
+    required this.timestamp,
+    required this.type,
+  });
+
+  @override
+  List<Object?> get props => [id, symbol, amount, price, timestamp, type];
+
+  CoreTrade copyWith({
+    String? id,
+    String? symbol,
+    double? amount,
+    double? price,
+    DateTime? timestamp,
+    CoreTradeType? type,
+  }) {
+    return CoreTrade(
+      id: id ?? this.id,
+      symbol: symbol ?? this.symbol,
+      amount: amount ?? this.amount,
+      price: price ?? this.price,
+      timestamp: timestamp ?? this.timestamp,
+      type: type ?? this.type,
+    );
+  }
+
+  factory CoreTrade.fromJson(Map<String, dynamic> json) {
+    return CoreTrade(
+      id: json['id'],
+      symbol: json['symbol'],
+      amount: json['amount'],
+      price: json['price'],
+      timestamp: DateTime.parse(json['timestamp']),
+      type: CoreTradeType.values
+          .firstWhere((e) => e.toString() == 'CoreTradeType.${json['type']}'),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'symbol': symbol,
+      'amount': amount,
+      'price': price,
+      'timestamp': timestamp.toIso8601String(),
+      'type': type.toString().split('.').last,
+    };
+  }
+}
+
+```
+
+./lib/core/error/error_handler.dart:
+```
+// lib/core/error/error_handler.dart
+
+import 'package:flutter/foundation.dart';
+
+class ErrorHandler {
+  static void logError(String message, dynamic error, StackTrace stackTrace) {
+    if (kDebugMode) {
+      print('Error: $message');
+      print('Details: $error');
+      print('StackTrace: $stackTrace');
+    }
+    // In un'applicazione reale, qui potresti inviare l'errore a un servizio di logging remoto
+  }
+
+  static String getUserFriendlyErrorMessage(dynamic error) {
+    if (error is NetworkError) {
+      return 'Si è verificato un problema di connessione. Controlla la tua connessione internet e riprova.';
+    } else if (error is AuthenticationError) {
+      return 'Si è verificato un problema di autenticazione. Per favore, effettua nuovamente il login.';
+    } else if (error is ValidationError) {
+      return 'Si è verificato un problema con i dati inseriti. Per favore, controlla i tuoi input e riprova.';
+    } else if (error is ApiError) {
+      return 'Si è verificato un errore durante la comunicazione con il server. Per favore, riprova più tardi.';
+    } else {
+      return 'Si è verificato un errore imprevisto. Per favore, riprova più tardi.';
+    }
+  }
+}
+
+class NetworkError implements Exception {}
+
+class AuthenticationError implements Exception {}
+
+class ValidationError implements Exception {}
+
+class ApiError implements Exception {
+  final String message;
+  ApiError(this.message);
+}
+
+```
+
