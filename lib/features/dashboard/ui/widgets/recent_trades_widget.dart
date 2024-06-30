@@ -6,7 +6,7 @@ class RecentTradesWidget extends StatelessWidget {
   final List<CoreTrade> trades;
   final int currentPage;
   final int tradesPerPage;
-  final Function() onLoadMore;
+  final Function(int) onPageChanged;
   final Function(int) onChangeTradesPerPage;
 
   const RecentTradesWidget({
@@ -14,13 +14,16 @@ class RecentTradesWidget extends StatelessWidget {
     required this.trades,
     required this.currentPage,
     required this.tradesPerPage,
-    required this.onLoadMore,
+    required this.onPageChanged,
     required this.onChangeTradesPerPage,
   });
 
   @override
   Widget build(BuildContext context) {
-    final displayedTrades = trades.take(tradesPerPage).toList();
+    final displayedTrades = trades
+        .skip((currentPage - 1) * tradesPerPage)
+        .take(tradesPerPage)
+        .toList();
 
     return Card(
       child: Padding(
@@ -46,16 +49,29 @@ class RecentTradesWidget extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                ElevatedButton(
-                  onPressed: onLoadMore,
-                  child: const Text('Load More'),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: currentPage > 1
+                          ? () => onPageChanged(currentPage - 1)
+                          : null,
+                    ),
+                    Text('$currentPage'),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: currentPage * tradesPerPage < trades.length
+                          ? () => onPageChanged(currentPage + 1)
+                          : null,
+                    ),
+                  ],
                 ),
                 DropdownButton<int>(
                   value: tradesPerPage,
-                  items: [10, 20, 50].map((int value) {
+                  items: [5, 10, 20].map((int value) {
                     return DropdownMenuItem<int>(
                       value: value,
-                      child: Text('$value per page'),
+                      child: Text('$value'),
                     );
                   }).toList(),
                   onChanged: (int? newValue) {
@@ -63,6 +79,8 @@ class RecentTradesWidget extends StatelessWidget {
                       onChangeTradesPerPage(newValue);
                     }
                   },
+                  isDense: true,
+                  underline: Container(),
                 ),
               ],
             ),
@@ -75,7 +93,7 @@ class RecentTradesWidget extends StatelessWidget {
   Widget _buildTradeItem(CoreTrade trade) {
     return ListTile(
       title: Text(
-        '${trade.type == CoreTradeType.buy ? 'Buy' : 'Sell'} ${trade.symbol}',
+        '${trade.type.name.toUpperCase()} ${trade.symbol}',
         style: TextStyle(
           fontWeight: FontWeight.bold,
           color: trade.type == CoreTradeType.buy ? Colors.green : Colors.red,

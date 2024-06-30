@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
-import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
 
 class ApiService {
   final String apiKey;
@@ -10,25 +9,41 @@ class ApiService {
 
   ApiService({required this.apiKey, required this.secretKey});
 
+  Future<int> getServerTime() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/api/v3/time'));
+      if (response.statusCode == 200) {
+        final serverTime = json.decode(response.body)['serverTime'];
+        return serverTime;
+      } else {
+        throw Exception('Failed to get server time');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<dynamic> get(String endpoint,
       {Map<String, dynamic>? queryParams, bool requiresAuth = false}) async {
     try {
       var params = queryParams ?? {};
       if (requiresAuth) {
-        params['timestamp'] = DateTime.now().millisecondsSinceEpoch.toString();
+        final serverTime = await getServerTime();
+        params['timestamp'] = serverTime.toString();
+        params['recvWindow'] = '60000';
         params['signature'] = _generateSignature(params);
       }
 
       final uri =
           Uri.parse('$baseUrl$endpoint').replace(queryParameters: params);
+
       final response = await http.get(
         uri,
         headers: _getHeaders(requiresAuth),
       );
       return _handleResponse(response);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('GET request failed: $endpoint', e, stackTrace);
-      rethrow;
+    } catch (e) {
+      throw Exception('GET request failed: $endpoint. Error: $e');
     }
   }
 
@@ -36,20 +51,22 @@ class ApiService {
       {bool requiresAuth = true}) async {
     try {
       if (requiresAuth) {
-        body['timestamp'] = DateTime.now().millisecondsSinceEpoch.toString();
+        final serverTime = await getServerTime();
+        body['timestamp'] = serverTime.toString();
+        body['recvWindow'] = '60000';
         body['signature'] = _generateSignature(body);
       }
 
       final uri = Uri.parse('$baseUrl$endpoint');
+
       final response = await http.post(
         uri,
         headers: _getHeaders(requiresAuth),
         body: body,
       );
       return _handleResponse(response);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('POST request failed: $endpoint', e, stackTrace);
-      rethrow;
+    } catch (e) {
+      throw Exception('POST request failed: $endpoint. Error: $e');
     }
   }
 
@@ -64,7 +81,8 @@ class ApiService {
   String _generateSignature(Map<String, dynamic> params) {
     final queryString = Uri(queryParameters: params).query;
     final hmac = Hmac(sha256, utf8.encode(secretKey));
-    return hmac.convert(utf8.encode(queryString)).toString();
+    final signature = hmac.convert(utf8.encode(queryString)).toString();
+    return signature;
   }
 
   dynamic _handleResponse(http.Response response) {
@@ -152,15 +170,16 @@ class ApiService {
   }
 
   Future<double> getCurrentPrice(String symbol) async {
-    if (symbol.isEmpty) {
-      throw ArgumentError('Symbol cannot be empty');
-    }
-    final response = await get('/api/v3/ticker/price',
-        queryParams: {'symbol': symbol}, requiresAuth: false);
-    if (response is Map<String, dynamic> && response.containsKey('price')) {
-      return double.parse(response['price']);
-    } else {
-      throw Exception('Unexpected response format for price');
+    try {
+      final response = await get('/api/v3/ticker/price',
+          queryParams: {'symbol': symbol}, requiresAuth: false);
+      if (response is Map<String, dynamic> && response.containsKey('price')) {
+        return double.parse(response['price']);
+      } else {
+        throw Exception('Unexpected response format for price');
+      }
+    } catch (e) {
+      return 0.0; // Return a default value or throw an exception based on your needs
     }
   }
 
