@@ -78,11 +78,11 @@ class DatabaseService {
       ''');
 
       await db.execute('''
-      CREATE TABLE strategy_status(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        status TEXT
-      )
-    ''');
+    CREATE TABLE IF NOT EXISTS strategy_status (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      status TEXT NOT NULL
+    )
+  ''');
     } catch (e, stackTrace) {
       ErrorHandler.logError('Failed to create database tables', e, stackTrace);
       throw Exception('Impossibile creare le tabelle del database');
@@ -151,11 +151,10 @@ class DatabaseService {
     }
   }
 
-  Future<int> update(String table, Map<String, dynamic> data) async {
+Future<int> update(String table, Map<String, dynamic> data, {String? where, List<Object?>? whereArgs}) async {
     try {
       Database db = await database;
-      String id = data['id'];
-      return await db.update(table, data, where: 'id = ?', whereArgs: [id]);
+      return await db.update(table, data, where: where, whereArgs: whereArgs);
     } catch (e, stackTrace) {
       ErrorHandler.logError('Failed to update data in $table', e, stackTrace);
       throw Exception('Impossibile aggiornare i dati nella tabella $table');

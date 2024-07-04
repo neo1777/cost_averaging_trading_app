@@ -1,6 +1,6 @@
-// lib/app.dart
-
 import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+import 'package:cost_averaging_trading_app/core/services/risk_management_service.dart';
+import 'package:cost_averaging_trading_app/core/services/trading_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:responsive_builder/responsive_builder.dart';
@@ -38,6 +38,27 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
+        RepositoryProvider<ApiService>.value(value: apiService),
+        RepositoryProvider<DatabaseService>.value(value: databaseService),
+        RepositoryProvider<SecureStorageService>.value(
+            value: secureStorageService),
+        RepositoryProvider<SettingsRepository>(
+          create: (context) => SettingsRepository(secureStorageService),
+        ),
+        RepositoryProvider<RiskManagementService>(
+          create: (context) => RiskManagementService(
+            context.read<SettingsRepository>(),
+            context.read<ApiService>(),
+            context.read<DatabaseService>(),
+          ),
+        ),
+        RepositoryProvider<TradingService>(
+          create: (context) => TradingService(
+            apiService,
+            databaseService,
+            context.read<RiskManagementService>(),
+          ),
+        ),
         RepositoryProvider<DashboardRepository>(
           create: (context) => DashboardRepository(
             apiService: apiService,
@@ -52,8 +73,8 @@ class App extends StatelessWidget {
         ),
         RepositoryProvider<StrategyRepository>(
           create: (context) => StrategyRepository(
-            //apiService: apiService,
             databaseService: databaseService,
+            tradingService: context.read<TradingService>(),
           ),
         ),
         RepositoryProvider<TradeHistoryRepository>(
@@ -78,11 +99,10 @@ class App extends StatelessWidget {
           ),
           BlocProvider<StrategyBloc>(
             create: (context) => StrategyBloc(
-              StrategyRepository(
-                databaseService: context.read<DatabaseService>(),
-              ),
+              context.read<StrategyRepository>(),
               context.read<SettingsRepository>(),
               context.read<BacktestingService>(),
+              context.read<RiskManagementService>(),
             ),
           ),
           BlocProvider<TradeHistoryBloc>(

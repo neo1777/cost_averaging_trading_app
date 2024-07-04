@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_bloc.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_event.dart';
@@ -23,6 +22,8 @@ class StrategyPage extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.message)),
           );
+        } else if (state is StrategyUnsafe) {
+          _showUnsafeStrategyDialog(context, state);
         }
       },
       builder: (context, state) {
@@ -86,6 +87,10 @@ class StrategyPage extends StatelessWidget {
                       CustomCard(
                         child: StrategyStatusWidget(
                           status: _mapStateStatusToWidgetStatus(state.status),
+                          onStart: () =>
+                              _showStartStrategyDialog(context, state),
+                          onStop: () =>
+                              context.read<StrategyBloc>().add(StopStrategy()),
                         ),
                       ),
                     ],
@@ -164,6 +169,8 @@ class StrategyPage extends StatelessWidget {
             CustomCard(
               child: StrategyStatusWidget(
                 status: _mapStateStatusToWidgetStatus(state.status),
+                onStart: () => _showStartStrategyDialog(context, state),
+                onStop: () => context.read<StrategyBloc>().add(StopStrategy()),
               ),
             ),
             const SizedBox(height: 16),
@@ -213,5 +220,213 @@ class StrategyPage extends StatelessWidget {
       default:
         return StrategyStatus.inactive;
     }
+  }
+
+  void _showStartStrategyDialog(BuildContext context, StrategyLoaded state) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Start Strategy'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Choose a mode to start the strategy:'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                child: const Text('Backtesting'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _showBacktestDialog(context);
+                },
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                child: const Text('Demo Mode'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  context.read<StrategyBloc>().add(StartDemoStrategy());
+                },
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                child: const Text('Live Mode'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _showLiveConfirmationDialog(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showBacktestDialog(BuildContext context) {
+    DateTime startDate = DateTime.now().subtract(const Duration(days: 30));
+    DateTime endDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Run Backtest'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Select date range for backtesting:'),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          child: Text(
+                              'Start: ${startDate.toLocal().toString().split(' ')[0]}'),
+                          onPressed: () async {
+                            final DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: startDate,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null && picked != startDate) {
+                              setState(() {
+                                startDate = picked;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: TextButton(
+                          child: Text(
+                              'End: ${endDate.toLocal().toString().split(' ')[0]}'),
+                          onPressed: () async {
+                            final DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: endDate,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null && picked != endDate) {
+                              setState(() {
+                                endDate = picked;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cancel'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ElevatedButton(
+                  child: const Text('Run Backtest'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context
+                        .read<StrategyBloc>()
+                        .add(RunBacktestEvent(startDate, endDate));
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showLiveConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Live Mode'),
+          content: const Text(
+              'Are you sure you want to start the strategy in live mode? This will use real funds.'),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Confirm'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showFinalLiveConfirmation(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showFinalLiveConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Final Confirmation'),
+          content: const Text(
+              'This is your final confirmation. The strategy will start in live mode using real funds. Are you absolutely sure?'),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Start Live Mode'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                context.read<StrategyBloc>().add(StartLiveStrategy());
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showUnsafeStrategyDialog(BuildContext context, StrategyUnsafe state) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Strategy Risk Warning'),
+          content: Text(state.message),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Start Anyway'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                context.read<StrategyBloc>().add(ForceStartStrategy());
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }

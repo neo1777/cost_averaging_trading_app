@@ -1,4 +1,5 @@
 import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+import 'package:cost_averaging_trading_app/core/models/strategy_execution_result.dart';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
@@ -57,52 +58,70 @@ class TradingService {
     }
   }
 
-  Future<void> executeStrategy(StrategyParameters params) async {
-    try {
-      final lastPurchaseDate = await _getLastPurchaseDate(params.symbol);
-      final now = DateTime.now();
-      if (lastPurchaseDate != null &&
-          now.difference(lastPurchaseDate).inDays < params.purchaseFrequency) {
-        return;
-      }
+Future<StrategyExecutionResult> executeStrategy(StrategyParameters params) async {
+  try {
+    print('Executing strategy for ${params.symbol}');
+    
+    final lastPurchaseDate = await _getLastPurchaseDate(params.symbol);
+    final now = DateTime.now();
+    if (lastPurchaseDate != null &&
+        now.difference(lastPurchaseDate).inDays < params.purchaseFrequency) {
+      print('Not enough time has passed since last purchase. Skipping execution.');
+      return StrategyExecutionResult.insufficientTime;
+    }
 
-      double currentPrice = await _apiService.getCurrentPrice(params.symbol);
-      double amountToBuy = params.investmentAmount / currentPrice;
-      amountToBuy = amountToBuy.clamp(0, params.maxInvestmentSize);
+    print('Fetching current price for ${params.symbol}');
+    double currentPrice = await _apiService.getCurrentPrice(params.symbol);
+    print('Current price: $currentPrice');
 
-      bool isTradeAllowed = await _riskManagementService.isCoreTradeAllowed(
-        CoreTrade(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          symbol: params.symbol,
-          amount: amountToBuy,
-          price: currentPrice,
-          timestamp: now,
-          type: CoreTradeType.buy,
-        ),
-        await _getCurrentPortfolioValue(),
-      );
+    double amountToBuy = params.investmentAmount / currentPrice;
+    amountToBuy = amountToBuy.clamp(0, params.maxInvestmentSize);
+    print('Amount to buy: $amountToBuy');
 
-      if (!isTradeAllowed) {
-        throw Exception('Trade not allowed: exceeds risk limits');
-      }
-
-      CoreTrade trade = CoreTrade(
+    print('Checking if trade is allowed');
+    double currentPortfolioValue = await _getCurrentPortfolioValue();
+    bool isTradeAllowed = await _riskManagementService.isCoreTradeAllowed(
+      CoreTrade(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         symbol: params.symbol,
         amount: amountToBuy,
         price: currentPrice,
         timestamp: now,
         type: CoreTradeType.buy,
-      );
+      ),
+      currentPortfolioValue,
+    );
 
-      await executeTrade(trade);
-      await _checkAndExecuteTakeProfit(params);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to execute strategy', e, stackTrace);
-      throw Exception('Error in strategy execution');
+  if (!isTradeAllowed) {
+      print('Trade not allowed: exceeds risk limits');
+      return StrategyExecutionResult.tradeNotAllowed;
     }
-  }
 
+    print('Creating trade object');
+    CoreTrade trade = CoreTrade(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      symbol: params.symbol,
+      amount: amountToBuy,
+      price: currentPrice,
+      timestamp: now,
+      type: CoreTradeType.buy,
+    );
+
+    print('Executing trade');
+    await executeTrade(trade);
+    print('Trade executed successfully');
+
+    print('Checking for take profit opportunities');
+    await _checkAndExecuteTakeProfit(params);
+    print('Strategy execution completed');
+   print('Strategy execution completed');
+    return StrategyExecutionResult.success;
+  } catch (e, stackTrace) {
+    ErrorHandler.logError('Failed to execute strategy', e, stackTrace);
+    print('Error in strategy execution: $e');
+    return StrategyExecutionResult.error;
+  }
+}
   Future<DateTime?> _getLastPurchaseDate(String symbol) async {
     final lastTrade = await _databaseService.getLastTrade(symbol);
     return lastTrade?.timestamp;
@@ -192,6 +211,17 @@ class TradingService {
       // Fallback to local data
       final localData = await _databaseService.query('trades');
       return localData.map((trade) => CoreTrade.fromJson(trade)).toList();
+    }
+  }
+
+  Future<void> stopStrategy() async {
+    try {
+      // Logica per fermare la strategia
+      // Ad esempio, cancellare tutti gli ordini aperti
+      // e aggiornare lo stato della strategia nel database
+      await _databaseService.update('strategy_status', {'status': 'inactive'});
+    } catch (e) {
+      throw Exception('Failed to stop strategy: $e');
     }
   }
 

@@ -38,3 +38,11 @@ class RunBacktestEvent extends StrategyEvent {
   @override
   List<Object> get props => [startDate, endDate];
 }
+
+class StartDemoStrategy extends StrategyEvent {}
+
+class StartLiveStrategy extends StrategyEvent {}
+
+class StopStrategy extends StrategyEvent {}
+
+class ForceStartStrategy extends StrategyEvent {}
