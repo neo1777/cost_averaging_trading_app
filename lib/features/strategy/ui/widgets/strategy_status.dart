@@ -1,5 +1,3 @@
-// lib/features/strategy/ui/widgets/strategy_status.dart
-
 import 'package:flutter/material.dart';
 
 enum StrategyStatus { inactive, active, paused }
@@ -8,12 +6,14 @@ class StrategyStatusWidget extends StatelessWidget {
   final StrategyStatus status;
   final VoidCallback onStart;
   final VoidCallback onStop;
+  final VoidCallback onSellEntirePortfolio;
 
   const StrategyStatusWidget({
     super.key,
     required this.status,
     required this.onStart,
     required this.onStop,
+    required this.onSellEntirePortfolio,
   });
 
   @override
@@ -28,6 +28,11 @@ class StrategyStatusWidget extends StatelessWidget {
         ElevatedButton(
           onPressed: status == StrategyStatus.active ? onStop : null,
           child: const Text('Stop Strategy'),
+        ),
+        ElevatedButton(
+          onPressed:
+              status == StrategyStatus.active ? onSellEntirePortfolio : null,
+          child: const Text('Sell Entire Portfolio'),
         ),
       ],
     );

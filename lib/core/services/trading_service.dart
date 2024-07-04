@@ -58,70 +58,110 @@ class TradingService {
     }
   }
 
-Future<StrategyExecutionResult> executeStrategy(StrategyParameters params) async {
-  try {
-    print('Executing strategy for ${params.symbol}');
-    
-    final lastPurchaseDate = await _getLastPurchaseDate(params.symbol);
-    final now = DateTime.now();
-    if (lastPurchaseDate != null &&
-        now.difference(lastPurchaseDate).inDays < params.purchaseFrequency) {
-      print('Not enough time has passed since last purchase. Skipping execution.');
-      return StrategyExecutionResult.insufficientTime;
-    }
+  Future<StrategyExecutionResult> executeStrategy(
+      StrategyParameters params) async {
+    try {
+      print('Executing strategy for ${params.symbol}');
 
-    print('Fetching current price for ${params.symbol}');
-    double currentPrice = await _apiService.getCurrentPrice(params.symbol);
-    print('Current price: $currentPrice');
+      final lastPurchaseDate = await _getLastPurchaseDate(params.symbol);
+      double currentPrice = await _apiService.getCurrentPrice(params.symbol);
 
-    double amountToBuy = params.investmentAmount / currentPrice;
-    amountToBuy = amountToBuy.clamp(0, params.maxInvestmentSize);
-    print('Amount to buy: $amountToBuy');
+      final now = DateTime.now();
+      if (lastPurchaseDate != null &&
+          now.difference(lastPurchaseDate).inDays < params.purchaseFrequency) {
+        print(
+            'Not enough time has passed since last purchase. Skipping execution.');
+        return StrategyExecutionResult.insufficientTime;
+      }
 
-    print('Checking if trade is allowed');
-    double currentPortfolioValue = await _getCurrentPortfolioValue();
-    bool isTradeAllowed = await _riskManagementService.isCoreTradeAllowed(
-      CoreTrade(
+      print('Fetching current price for ${params.symbol}');
+      print('Current price: $currentPrice');
+      Portfolio portfolio = await _getPortfolio(params.symbol);
+
+      double averageEntryPrice = portfolio.averagePrice;
+
+      if (currentPrice <=
+          averageEntryPrice * (1 - params.stopLossPercentage / 100)) {
+        await sellEntirePortfolio(params.symbol, 0); // Vendere immediatamente
+        return StrategyExecutionResult.stopLossTriggered;
+      }
+      double minimumTradableAmount =
+          calculateMinimumTradableAmount(currentPrice, params.investmentAmount);
+      double amountToBuy =
+          minimumTradableAmount.clamp(0, params.maxInvestmentSize);
+      print('Amount to buy: $amountToBuy');
+
+      print('Checking if trade is allowed');
+      double currentPortfolioValue = await _getCurrentPortfolioValue();
+      bool isTradeAllowed = await _riskManagementService.isCoreTradeAllowed(
+        CoreTrade(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          symbol: params.symbol,
+          amount: amountToBuy,
+          price: currentPrice,
+          timestamp: now,
+          type: CoreTradeType.buy,
+        ),
+        currentPortfolioValue,
+      );
+
+      if (!isTradeAllowed) {
+        print('Trade not allowed: exceeds risk limits');
+        return StrategyExecutionResult.tradeNotAllowed;
+      }
+
+      print('Creating trade object');
+      CoreTrade trade = CoreTrade(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         symbol: params.symbol,
         amount: amountToBuy,
         price: currentPrice,
         timestamp: now,
         type: CoreTradeType.buy,
-      ),
-      currentPortfolioValue,
-    );
+      );
 
-  if (!isTradeAllowed) {
-      print('Trade not allowed: exceeds risk limits');
-      return StrategyExecutionResult.tradeNotAllowed;
+      print('Executing trade');
+      await executeTrade(trade);
+      print('Trade executed successfully');
+
+      print('Checking for take profit opportunities');
+      await _checkAndExecuteTakeProfit(params);
+      print('Strategy execution completed');
+      return StrategyExecutionResult.success;
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to execute strategy', e, stackTrace);
+      print('Error in strategy execution: $e');
+      return StrategyExecutionResult.error;
     }
-
-    print('Creating trade object');
-    CoreTrade trade = CoreTrade(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      symbol: params.symbol,
-      amount: amountToBuy,
-      price: currentPrice,
-      timestamp: now,
-      type: CoreTradeType.buy,
-    );
-
-    print('Executing trade');
-    await executeTrade(trade);
-    print('Trade executed successfully');
-
-    print('Checking for take profit opportunities');
-    await _checkAndExecuteTakeProfit(params);
-    print('Strategy execution completed');
-   print('Strategy execution completed');
-    return StrategyExecutionResult.success;
-  } catch (e, stackTrace) {
-    ErrorHandler.logError('Failed to execute strategy', e, stackTrace);
-    print('Error in strategy execution: $e');
-    return StrategyExecutionResult.error;
   }
-}
+
+  double calculateMinimumTradableAmount(double price, double minOrderValue) {
+    return (minOrderValue / price).ceil() * price;
+  }
+
+  Future<void> sellEntirePortfolio(String symbol, double targetProfit) async {
+    try {
+      var portfolio = await _getPortfolio(symbol);
+      var currentPrice = await _apiService.getCurrentPrice(symbol);
+      if (currentPrice >= portfolio.averagePrice * (1 + targetProfit)) {
+        await executeTrade(CoreTrade(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          symbol: symbol,
+          amount: portfolio.totalAmount,
+          price: currentPrice,
+          timestamp: DateTime.now(),
+          type: CoreTradeType.sell,
+        ));
+        print('Entire portfolio sold successfully');
+      } else {
+        print('Current price does not meet target profit. No action taken.');
+      }
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to sell entire portfolio', e, stackTrace);
+      throw Exception('Error in selling entire portfolio');
+    }
+  }
+
   Future<DateTime?> _getLastPurchaseDate(String symbol) async {
     final lastTrade = await _databaseService.getLastTrade(symbol);
     return lastTrade?.timestamp;
@@ -148,15 +188,7 @@ Future<StrategyExecutionResult> executeStrategy(StrategyParameters params) async
     double currentPrice = await _getCurrentPrice(params.symbol);
 
     if (currentPrice >= averagePrice * (1 + params.targetProfitPercentage)) {
-      CoreTrade sellTrade = CoreTrade(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        symbol: params.symbol,
-        amount: totalAmount,
-        price: currentPrice,
-        timestamp: DateTime.now(),
-        type: CoreTradeType.sell,
-      );
-      await executeTrade(sellTrade);
+      await sellEntirePortfolio(params.symbol, params.targetProfitPercentage);
     }
   }
 
@@ -272,7 +304,7 @@ Future<StrategyExecutionResult> executeStrategy(StrategyParameters params) async
         return StrategyParameters.fromJson(data.first);
       } else {
         // Return default parameters if none are saved
-        return const StrategyParameters(
+        return StrategyParameters(
           symbol: 'BTCUSDT',
           investmentAmount: 100.0,
           intervalDays: 7,
@@ -287,4 +319,42 @@ Future<StrategyExecutionResult> executeStrategy(StrategyParameters params) async
       throw Exception('Error getting strategy parameters');
     }
   }
+
+  Future<Portfolio> _getPortfolio(String symbol) async {
+    try {
+      final trades = await getTradeHistory(symbol);
+      double totalAmount = 0;
+      double totalValue = 0;
+      for (var trade in trades) {
+        if (trade.type == CoreTradeType.buy) {
+          totalAmount += trade.amount;
+          totalValue += trade.amount * trade.price;
+        } else {
+          totalAmount -= trade.amount;
+          totalValue -= trade.amount * trade.price;
+        }
+      }
+      double averagePrice = totalValue / totalAmount;
+      return Portfolio(
+        symbol: symbol,
+        totalAmount: totalAmount,
+        averagePrice: averagePrice,
+      );
+    } catch (e, stackTrace) {
+      ErrorHandler.logError('Failed to get portfolio', e, stackTrace);
+      throw Exception('Error getting portfolio');
+    }
+  }
+}
+
+class Portfolio {
+  final String symbol;
+  final double totalAmount;
+  final double averagePrice;
+
+  Portfolio({
+    required this.symbol,
+    required this.totalAmount,
+    required this.averagePrice,
+  });
 }

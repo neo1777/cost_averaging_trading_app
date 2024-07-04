@@ -52,66 +52,88 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
       child: Column(
         children: [
           TextFormField(
-            controller: _symbolController,
-            decoration: const InputDecoration(labelText: 'Symbol'),
-            onChanged: (_) => _updateParameters(),
+            decoration: InputDecoration(labelText: 'Symbol'),
+            initialValue: widget.initialParameters?.symbol ?? '',
+            onChanged: (value) => _updateParameters(symbol: value),
           ),
           TextFormField(
-            controller: _investmentAmountController,
-            decoration: const InputDecoration(labelText: 'Investment Amount'),
+            decoration: InputDecoration(labelText: 'Investment Amount'),
+            initialValue:
+                widget.initialParameters?.investmentAmount.toString() ?? '',
             keyboardType: TextInputType.number,
-            onChanged: (_) => _updateParameters(),
+            onChanged: (value) =>
+                _updateParameters(investmentAmount: double.tryParse(value)),
           ),
           TextFormField(
-            controller: _intervalDaysController,
-            decoration: const InputDecoration(labelText: 'Interval (days)'),
+            decoration: InputDecoration(labelText: 'Interval (days)'),
+            initialValue:
+                widget.initialParameters?.intervalDays.toString() ?? '',
             keyboardType: TextInputType.number,
-            onChanged: (_) => _updateParameters(),
+            onChanged: (value) =>
+                _updateParameters(intervalDays: int.tryParse(value)),
           ),
           TextFormField(
-            controller: _targetProfitPercentageController,
-            decoration: const InputDecoration(labelText: 'Target Profit (%)'),
+            decoration: InputDecoration(labelText: 'Target Profit (%)'),
+            initialValue:
+                widget.initialParameters?.targetProfitPercentage.toString() ??
+                    '',
             keyboardType: TextInputType.number,
-            onChanged: (_) => _updateParameters(),
+            onChanged: (value) => _updateParameters(
+                targetProfitPercentage: double.tryParse(value)),
           ),
           TextFormField(
-            controller: _stopLossPercentageController,
-            decoration: const InputDecoration(labelText: 'Stop Loss (%)'),
+            decoration: InputDecoration(labelText: 'Stop Loss (%)'),
+            initialValue:
+                widget.initialParameters?.stopLossPercentage.toString() ?? '',
             keyboardType: TextInputType.number,
-            onChanged: (_) => _updateParameters(),
+            onChanged: (value) =>
+                _updateParameters(stopLossPercentage: double.tryParse(value)),
           ),
           TextFormField(
-            controller: _purchaseFrequencyController,
-            decoration:
-                const InputDecoration(labelText: 'Purchase Frequency (days)'),
+            decoration: InputDecoration(labelText: 'Purchase Frequency (days)'),
+            initialValue:
+                widget.initialParameters?.purchaseFrequency.toString() ?? '',
             keyboardType: TextInputType.number,
-            onChanged: (_) => _updateParameters(),
+            onChanged: (value) =>
+                _updateParameters(purchaseFrequency: int.tryParse(value)),
           ),
           TextFormField(
-            controller: _maxInvestmentSizeController,
-            decoration: const InputDecoration(labelText: 'Max Investment Size'),
+            decoration: InputDecoration(labelText: 'Max Investment Size'),
+            initialValue:
+                widget.initialParameters?.maxInvestmentSize.toString() ?? '',
             keyboardType: TextInputType.number,
-            onChanged: (_) => _updateParameters(),
+            onChanged: (value) =>
+                _updateParameters(maxInvestmentSize: double.tryParse(value)),
           ),
         ],
       ),
     );
   }
 
-  void _updateParameters() {
-    final parameters = StrategyParameters(
-      symbol: _symbolController.text,
-      investmentAmount: double.tryParse(_investmentAmountController.text) ?? 0,
-      intervalDays: int.tryParse(_intervalDaysController.text) ?? 0,
-      targetProfitPercentage:
-          double.tryParse(_targetProfitPercentageController.text) ?? 0,
+  void _updateParameters({
+    String? symbol,
+    double? investmentAmount,
+    int? intervalDays,
+    double? targetProfitPercentage,
+    double? stopLossPercentage,
+    int? purchaseFrequency,
+    double? maxInvestmentSize,
+  }) {
+    final updatedParameters = StrategyParameters(
+      symbol: symbol ?? widget.initialParameters!.symbol,
+      investmentAmount:
+          investmentAmount ?? widget.initialParameters!.investmentAmount,
+      intervalDays: intervalDays ?? widget.initialParameters!.intervalDays,
+      targetProfitPercentage: targetProfitPercentage ??
+          widget.initialParameters!.targetProfitPercentage,
       stopLossPercentage:
-          double.tryParse(_stopLossPercentageController.text) ?? 0,
-      purchaseFrequency: int.tryParse(_purchaseFrequencyController.text) ?? 0,
+          stopLossPercentage ?? widget.initialParameters!.stopLossPercentage,
+      purchaseFrequency:
+          purchaseFrequency ?? widget.initialParameters!.purchaseFrequency,
       maxInvestmentSize:
-          double.tryParse(_maxInvestmentSizeController.text) ?? 0,
+          maxInvestmentSize ?? widget.initialParameters!.maxInvestmentSize,
     );
-    widget.onParametersChanged(parameters);
+    widget.onParametersChanged(updatedParameters);
   }
 
   @override

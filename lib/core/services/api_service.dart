@@ -145,7 +145,7 @@ class ApiService {
     return await get('/api/v3/exchangeInfo', requiresAuth: false);
   }
 
-  Future<List<Map<String, dynamic>>> getKlines({
+  Future<List<dynamic>> getKlines({
     required String symbol,
     required String interval,
     int? limit,
@@ -161,7 +161,7 @@ class ApiService {
     };
     final response = await get('/api/v3/klines',
         queryParams: queryParams, requiresAuth: false);
-    return List<Map<String, dynamic>>.from(response);
+    return response;
   }
 
   Future<Map<String, dynamic>> get24hrTickerPriceChange(String symbol) async {

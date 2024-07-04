@@ -9,7 +9,7 @@ class StrategyParameters extends Equatable {
   final int purchaseFrequency;
   final double maxInvestmentSize;
 
-  const StrategyParameters({
+  StrategyParameters({
     required this.symbol,
     required this.investmentAmount,
     required this.intervalDays,
@@ -17,7 +17,16 @@ class StrategyParameters extends Equatable {
     required this.stopLossPercentage,
     required this.purchaseFrequency,
     required this.maxInvestmentSize,
-  });
+  }) {
+    assert(investmentAmount > 0, 'Investment amount must be positive');
+    assert(intervalDays > 0, 'Interval days must be positive');
+    assert(targetProfitPercentage > 0 && targetProfitPercentage <= 100,
+        'Target profit must be between 0 and 100');
+    assert(stopLossPercentage > 0 && stopLossPercentage <= 100,
+        'Stop loss must be between 0 and 100');
+    assert(purchaseFrequency > 0, 'Purchase frequency must be positive');
+    assert(maxInvestmentSize > 0, 'Max investment size must be positive');
+  }
 
   @override
   List<Object> get props => [

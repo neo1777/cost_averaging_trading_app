@@ -29,7 +29,7 @@ class StrategyRepository {
         return StrategyParameters.fromJson(data.first);
       }
       // Return default parameters if none are saved
-      return const StrategyParameters(
+      return StrategyParameters(
         symbol: 'BTCUSDT',
         investmentAmount: 100.0,
         intervalDays: 7,
@@ -128,6 +128,8 @@ class StrategyRepository {
           break;
         case StrategyExecutionResult.error:
           throw Exception('Error occurred during strategy execution');
+        case StrategyExecutionResult.stopLossTriggered:
+          print('Stop loss triggered, entire portfolio sold');
       }
     } catch (e) {
       print('Error in startDemoStrategy: $e');
@@ -138,8 +140,12 @@ class StrategyRepository {
   Future<void> startLiveStrategy(StrategyParameters parameters) async {
     try {
       tradingService.setDemoMode(false);
-      await tradingService.executeStrategy(parameters);
-      await saveStrategyStatus(StrategyStateStatus.active);
+      final result = await tradingService.executeStrategy(parameters);
+      if (result == StrategyExecutionResult.success) {
+        await saveStrategyStatus(StrategyStateStatus.active);
+      } else {
+        throw Exception('Failed to start live strategy: ${result.message}');
+      }
     } catch (e) {
       throw Exception('Failed to start live strategy: $e');
     }
@@ -159,10 +165,19 @@ class StrategyRepository {
           {'status': 'inactive'},
         );
       }
+      await tradingService.stopStrategy();
       print('Strategy stopped successfully');
     } catch (e) {
       print('Error stopping strategy: $e');
       throw Exception('Failed to stop strategy: $e');
+    }
+  }
+
+  Future<void> sellEntirePortfolio(String symbol, double targetProfit) async {
+    try {
+      await tradingService.sellEntirePortfolio(symbol, targetProfit);
+    } catch (e) {
+      throw Exception('Failed to sell entire portfolio: $e');
     }
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cost_averaging_trading_app/core/services/risk_management_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
@@ -26,6 +28,7 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
     on<StartLiveStrategy>(_onStartLiveStrategy);
     on<StopStrategy>(_onStopStrategy);
     on<ForceStartStrategy>(_onForceStartStrategy);
+    on<SellEntirePortfolio>(_onSellEntirePortfolio);
   }
 
   Future<void> _onLoadStrategyData(
@@ -101,32 +104,32 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
     }
   }
 
-  Future<void> _onRunBacktest(
-    RunBacktestEvent event,
-    Emitter<StrategyState> emit,
-  ) async {
-    if (state is StrategyLoaded) {
-      final currentState = state as StrategyLoaded;
-      emit(StrategyLoading());
-      try {
-        final backtestResult = await _backtestingService.runBacktest(
-          currentState.parameters.symbol,
-          event.startDate,
-          event.endDate,
-          currentState.parameters,
-        );
-        emit(StrategyLoaded(
-          parameters: currentState.parameters,
-          status: currentState.status,
-          chartData: currentState.chartData,
-          riskManagementSettings: currentState.riskManagementSettings,
-          backtestResult: backtestResult,
-        ));
-      } catch (e) {
-        emit(StrategyError('Failed to run backtest: ${e.toString()}'));
-      }
+Future<void> _onRunBacktest(
+  RunBacktestEvent event,
+  Emitter<StrategyState> emit,
+) async {
+  if (state is StrategyLoaded) {
+    final currentState = state as StrategyLoaded;
+    emit(StrategyLoading());
+    try {
+      final backtestResult = await _backtestingService.runBacktest(
+        currentState.parameters.symbol,
+        event.startDate,
+        event.endDate,
+        currentState.parameters,
+      );
+      emit(StrategyLoaded(
+        parameters: currentState.parameters,
+        status: currentState.status,
+        chartData: currentState.chartData,
+        riskManagementSettings: currentState.riskManagementSettings,
+        backtestResult: backtestResult,
+      ));
+    } catch (e) {
+      emit(StrategyError('Failed to run backtest: ${e.toString()}'));
     }
   }
+}
 
   Future<void> _onStartDemoStrategy(
     StartDemoStrategy event,
@@ -244,6 +247,27 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
       }
     } else {
       print('Cannot stop strategy: not in loaded state');
+    }
+  }
+
+  Future<void> _onSellEntirePortfolio(
+    SellEntirePortfolio event,
+    Emitter<StrategyState> emit,
+  ) async {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      try {
+        await _strategyRepository.sellEntirePortfolio(
+            event.symbol, event.targetProfit);
+        emit(StrategyLoaded(
+          parameters: currentState.parameters,
+          status: StrategyStateStatus.inactive,
+          chartData: currentState.chartData,
+          riskManagementSettings: currentState.riskManagementSettings,
+        ));
+      } catch (e) {
+        emit(StrategyError('Failed to sell entire portfolio: ${e.toString()}'));
+      }
     }
   }
 }

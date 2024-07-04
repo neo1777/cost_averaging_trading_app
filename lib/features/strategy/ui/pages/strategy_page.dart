@@ -91,6 +91,8 @@ class StrategyPage extends StatelessWidget {
                               _showStartStrategyDialog(context, state),
                           onStop: () =>
                               context.read<StrategyBloc>().add(StopStrategy()),
+                          onSellEntirePortfolio: () =>
+                              _showSellEntirePortfolioDialog(context, state),
                         ),
                       ),
                     ],
@@ -171,6 +173,8 @@ class StrategyPage extends StatelessWidget {
                 status: _mapStateStatusToWidgetStatus(state.status),
                 onStart: () => _showStartStrategyDialog(context, state),
                 onStop: () => context.read<StrategyBloc>().add(StopStrategy()),
+                onSellEntirePortfolio: () =>
+                    _showSellEntirePortfolioDialog(context, state),
               ),
             ),
             const SizedBox(height: 16),
@@ -258,6 +262,38 @@ class StrategyPage extends StatelessWidget {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  void _showSellEntirePortfolioDialog(
+      BuildContext context, StrategyLoaded state) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Sell Entire Portfolio'),
+          content: const Text(
+              'Are you sure you want to sell your entire portfolio? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Sell'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                context.read<StrategyBloc>().add(SellEntirePortfolio(
+                      symbol: state.parameters.symbol,
+                      targetProfit: state.parameters.targetProfitPercentage,
+                    ));
+              },
+            ),
+          ],
         );
       },
     );

@@ -1,7 +1,6 @@
-
-import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:flutter/material.dart';
 import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
 
 class BacktestResults extends StatelessWidget {
   final BacktestResult? backtestResult;
@@ -39,12 +38,11 @@ class BacktestResults extends StatelessWidget {
       children: [
         ElevatedButton(
           onPressed: () {
-            // Implementa la logica per selezionare le date
             final now = DateTime.now();
             final oneYearAgo = now.subtract(const Duration(days: 365));
             onRunBacktest(oneYearAgo, now);
           },
-          child: const Text('Run Backtest'),
+          child: const Text('Run Backtest (Last Year)'),
         ),
       ],
     );
@@ -57,7 +55,8 @@ class BacktestResults extends StatelessWidget {
       children: [
         Text('Total Profit: \$${performance.totalProfit.toStringAsFixed(2)}'),
         Text('Win Rate: ${(performance.winRate * 100).toStringAsFixed(2)}%'),
-        Text('Max Drawdown: ${(performance.maxDrawdown * 100).toStringAsFixed(2)}%'),
+        Text(
+            'Max Drawdown: ${(performance.maxDrawdown * 100).toStringAsFixed(2)}%'),
         Text('Sharpe Ratio: ${performance.sharpeRatio.toStringAsFixed(2)}'),
       ],
     );
@@ -79,7 +78,8 @@ class BacktestResults extends StatelessWidget {
             itemBuilder: (context, index) {
               final trade = backtestResult!.trades[index];
               return ListTile(
-                title: Text('${trade.type == CoreTradeType.buy ? 'Buy' : 'Sell'} ${trade.amount} ${trade.symbol}'),
+                title: Text(
+                    '${trade.type == CoreTradeType.buy ? 'Buy' : 'Sell'} ${trade.amount.toStringAsFixed(8)} ${trade.symbol}'),
                 subtitle: Text('Price: \$${trade.price.toStringAsFixed(2)}'),
                 trailing: Text(trade.timestamp.toString().split(' ')[0]),
               );
