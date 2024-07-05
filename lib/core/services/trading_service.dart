@@ -61,7 +61,6 @@ class TradingService {
   Future<StrategyExecutionResult> executeStrategy(
       StrategyParameters params) async {
     try {
-      print('Executing strategy for ${params.symbol}');
 
       final lastPurchaseDate = await _getLastPurchaseDate(params.symbol);
       double currentPrice = await _apiService.getCurrentPrice(params.symbol);
@@ -69,13 +68,9 @@ class TradingService {
       final now = DateTime.now();
       if (lastPurchaseDate != null &&
           now.difference(lastPurchaseDate).inDays < params.purchaseFrequency) {
-        print(
-            'Not enough time has passed since last purchase. Skipping execution.');
         return StrategyExecutionResult.insufficientTime;
       }
 
-      print('Fetching current price for ${params.symbol}');
-      print('Current price: $currentPrice');
       Portfolio portfolio = await _getPortfolio(params.symbol);
 
       double averageEntryPrice = portfolio.averagePrice;
@@ -89,9 +84,7 @@ class TradingService {
           calculateMinimumTradableAmount(currentPrice, params.investmentAmount);
       double amountToBuy =
           minimumTradableAmount.clamp(0, params.maxInvestmentSize);
-      print('Amount to buy: $amountToBuy');
 
-      print('Checking if trade is allowed');
       double currentPortfolioValue = await _getCurrentPortfolioValue();
       bool isTradeAllowed = await _riskManagementService.isCoreTradeAllowed(
         CoreTrade(
@@ -106,11 +99,9 @@ class TradingService {
       );
 
       if (!isTradeAllowed) {
-        print('Trade not allowed: exceeds risk limits');
         return StrategyExecutionResult.tradeNotAllowed;
       }
 
-      print('Creating trade object');
       CoreTrade trade = CoreTrade(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         symbol: params.symbol,
@@ -120,17 +111,12 @@ class TradingService {
         type: CoreTradeType.buy,
       );
 
-      print('Executing trade');
       await executeTrade(trade);
-      print('Trade executed successfully');
 
-      print('Checking for take profit opportunities');
       await _checkAndExecuteTakeProfit(params);
-      print('Strategy execution completed');
       return StrategyExecutionResult.success;
     } catch (e, stackTrace) {
       ErrorHandler.logError('Failed to execute strategy', e, stackTrace);
-      print('Error in strategy execution: $e');
       return StrategyExecutionResult.error;
     }
   }
@@ -152,9 +138,7 @@ class TradingService {
           timestamp: DateTime.now(),
           type: CoreTradeType.sell,
         ));
-        print('Entire portfolio sold successfully');
       } else {
-        print('Current price does not meet target profit. No action taken.');
       }
     } catch (e, stackTrace) {
       ErrorHandler.logError('Failed to sell entire portfolio', e, stackTrace);

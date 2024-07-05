@@ -205,7 +205,7 @@ Future<void> _onRunBacktest(
       ));
     } catch (e) {
       if (e.toString().contains('Trade not allowed')) {
-        emit(StrategyError(
+        emit(const StrategyError(
             'Strategy not started: Trade not allowed due to risk limits'));
       } else {
         emit(StrategyError('Failed to start strategy: ${e.toString()}'));
@@ -229,12 +229,10 @@ Future<void> _onRunBacktest(
     StopStrategy event,
     Emitter<StrategyState> emit,
   ) async {
-    print('Stopping strategy');
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
       try {
         await _strategyRepository.stopStrategy();
-        print('Strategy stopped successfully');
         emit(StrategyLoaded(
           parameters: currentState.parameters,
           status: StrategyStateStatus.inactive,
@@ -242,11 +240,9 @@ Future<void> _onRunBacktest(
           riskManagementSettings: currentState.riskManagementSettings,
         ));
       } catch (e) {
-        print('Error in _onStopStrategy: $e');
         emit(StrategyError('Failed to stop strategy: ${e.toString()}'));
       }
     } else {
-      print('Cannot stop strategy: not in loaded state');
     }
   }
 

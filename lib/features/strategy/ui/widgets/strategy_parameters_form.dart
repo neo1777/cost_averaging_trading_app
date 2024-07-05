@@ -52,12 +52,12 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
       child: Column(
         children: [
           TextFormField(
-            decoration: InputDecoration(labelText: 'Symbol'),
+            decoration: const InputDecoration(labelText: 'Symbol'),
             initialValue: widget.initialParameters?.symbol ?? '',
             onChanged: (value) => _updateParameters(symbol: value),
           ),
           TextFormField(
-            decoration: InputDecoration(labelText: 'Investment Amount'),
+            decoration: const InputDecoration(labelText: 'Investment Amount'),
             initialValue:
                 widget.initialParameters?.investmentAmount.toString() ?? '',
             keyboardType: TextInputType.number,
@@ -65,7 +65,7 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
                 _updateParameters(investmentAmount: double.tryParse(value)),
           ),
           TextFormField(
-            decoration: InputDecoration(labelText: 'Interval (days)'),
+            decoration: const InputDecoration(labelText: 'Interval (days)'),
             initialValue:
                 widget.initialParameters?.intervalDays.toString() ?? '',
             keyboardType: TextInputType.number,
@@ -73,7 +73,7 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
                 _updateParameters(intervalDays: int.tryParse(value)),
           ),
           TextFormField(
-            decoration: InputDecoration(labelText: 'Target Profit (%)'),
+            decoration: const InputDecoration(labelText: 'Target Profit (%)'),
             initialValue:
                 widget.initialParameters?.targetProfitPercentage.toString() ??
                     '',
@@ -82,7 +82,7 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
                 targetProfitPercentage: double.tryParse(value)),
           ),
           TextFormField(
-            decoration: InputDecoration(labelText: 'Stop Loss (%)'),
+            decoration: const InputDecoration(labelText: 'Stop Loss (%)'),
             initialValue:
                 widget.initialParameters?.stopLossPercentage.toString() ?? '',
             keyboardType: TextInputType.number,
@@ -90,7 +90,7 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
                 _updateParameters(stopLossPercentage: double.tryParse(value)),
           ),
           TextFormField(
-            decoration: InputDecoration(labelText: 'Purchase Frequency (days)'),
+            decoration: const InputDecoration(labelText: 'Purchase Frequency (days)'),
             initialValue:
                 widget.initialParameters?.purchaseFrequency.toString() ?? '',
             keyboardType: TextInputType.number,
@@ -98,7 +98,7 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
                 _updateParameters(purchaseFrequency: int.tryParse(value)),
           ),
           TextFormField(
-            decoration: InputDecoration(labelText: 'Max Investment Size'),
+            decoration: const InputDecoration(labelText: 'Max Investment Size'),
             initialValue:
                 widget.initialParameters?.maxInvestmentSize.toString() ?? '',
             keyboardType: TextInputType.number,

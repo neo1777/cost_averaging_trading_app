@@ -18,7 +18,7 @@ class StrategyRepository {
         await databaseService.insert('strategy_status', {'status': 'inactive'});
       }
     } catch (e) {
-      print('Error initializing strategy status: $e');
+      throw Exception('Failed initialize strategy: $e');
     }
   }
 
@@ -106,33 +106,24 @@ class StrategyRepository {
 
   Future<void> startDemoStrategy(StrategyParameters parameters) async {
     try {
-      print('Starting demo strategy');
       tradingService.setDemoMode(true);
-      print('Demo mode set');
 
       final result = await tradingService.executeStrategy(parameters);
       switch (result) {
         case StrategyExecutionResult.success:
-          print('Strategy executed successfully');
           await saveStrategyStatus(StrategyStateStatus.active);
           break;
         case StrategyExecutionResult.tradeNotAllowed:
-          print(
-              'Strategy execution skipped: Trade not allowed due to risk limits');
           // Potremmo voler gestire questo caso in modo specifico, ad esempio notificando l'utente
           break;
         case StrategyExecutionResult.insufficientTime:
-          print(
-              'Strategy execution skipped: Insufficient time since last trade');
           // Anche qui, potremmo voler gestire questo caso in modo specifico
           break;
         case StrategyExecutionResult.error:
           throw Exception('Error occurred during strategy execution');
         case StrategyExecutionResult.stopLossTriggered:
-          print('Stop loss triggered, entire portfolio sold');
       }
     } catch (e) {
-      print('Error in startDemoStrategy: $e');
       throw Exception('Error in strategy execution: $e');
     }
   }
@@ -153,22 +144,17 @@ class StrategyRepository {
 
   Future<void> stopStrategy() async {
     try {
-      print('Attempting to stop strategy');
       final existingStatus = await databaseService.query('strategy_status');
       if (existingStatus.isEmpty) {
-        print('No existing status, inserting new status');
         await databaseService.insert('strategy_status', {'status': 'inactive'});
       } else {
-        print('Updating existing status');
         await databaseService.update(
           'strategy_status',
           {'status': 'inactive'},
         );
       }
       await tradingService.stopStrategy();
-      print('Strategy stopped successfully');
     } catch (e) {
-      print('Error stopping strategy: $e');
       throw Exception('Failed to stop strategy: $e');
     }
   }

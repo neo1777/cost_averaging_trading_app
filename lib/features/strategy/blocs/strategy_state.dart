@@ -71,19 +71,14 @@ class StrategyUnsafe extends StrategyLoaded {
   final String message;
   final bool isDemo;
 
-  StrategyUnsafe({
+  const StrategyUnsafe({
     required this.message,
-    required StrategyParameters parameters,
-    required StrategyStateStatus status,
-    required List<Map<String, dynamic>> chartData,
-    required RiskManagementSettings riskManagementSettings,
+    required super.parameters,
+    required super.status,
+    required super.chartData,
+    required super.riskManagementSettings,
     required this.isDemo,
-  }) : super(
-          parameters: parameters,
-          status: status,
-          chartData: chartData,
-          riskManagementSettings: riskManagementSettings,
-        );
+  });
 
   @override
   List<Object> get props => [...super.props, message, isDemo];
