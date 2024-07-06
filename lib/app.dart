@@ -1,13 +1,12 @@
-import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
-import 'package:cost_averaging_trading_app/core/services/risk_management_service.dart';
-import 'package:cost_averaging_trading_app/core/services/trading_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:responsive_builder/responsive_builder.dart';
 import 'package:cost_averaging_trading_app/core/theme/app_theme.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
 import 'package:cost_averaging_trading_app/core/services/secure_storage_service.dart';
+import 'package:cost_averaging_trading_app/core/services/risk_management_service.dart';
+import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
+import 'package:cost_averaging_trading_app/core/services/trading_service.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/repositories/dashboard_repository.dart';
 import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_bloc.dart';
@@ -52,11 +51,17 @@ class App extends StatelessWidget {
             context.read<DatabaseService>(),
           ),
         ),
+        RepositoryProvider<StrategyRepository>(
+          create: (context) => StrategyRepository(
+            databaseService: context.read<DatabaseService>(),
+            //tradingService: context.read<TradingService>(),
+          ),
+        ),
         RepositoryProvider<TradingService>(
           create: (context) => TradingService(
-            apiService,
-            databaseService,
-            context.read<RiskManagementService>(),
+            context.read<ApiService>(),
+            context.read<DatabaseService>(),
+            context.read<StrategyRepository>(),
           ),
         ),
         RepositoryProvider<DashboardRepository>(
@@ -71,17 +76,8 @@ class App extends StatelessWidget {
             databaseService: databaseService,
           ),
         ),
-        RepositoryProvider<StrategyRepository>(
-          create: (context) => StrategyRepository(
-            databaseService: databaseService,
-            tradingService: context.read<TradingService>(),
-          ),
-        ),
         RepositoryProvider<TradeHistoryRepository>(
           create: (context) => TradeHistoryRepository(),
-        ),
-        RepositoryProvider<SettingsRepository>(
-          create: (context) => SettingsRepository(secureStorageService),
         ),
         RepositoryProvider<BacktestingService>(
           create: (context) => BacktestingService(apiService),
@@ -100,9 +96,9 @@ class App extends StatelessWidget {
           BlocProvider<StrategyBloc>(
             create: (context) => StrategyBloc(
               context.read<StrategyRepository>(),
-              context.read<SettingsRepository>(),
-              context.read<BacktestingService>(),
               context.read<RiskManagementService>(),
+              context.read<BacktestingService>(),
+              context.read<TradingService>(),
             ),
           ),
           BlocProvider<TradeHistoryBloc>(
@@ -119,12 +115,8 @@ class App extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
-          home: ResponsiveBuilder(
-            builder: (context, sizingInformation) {
-              return const MainLayout(
-                child: DashboardPage(),
-              );
-            },
+          home: const MainLayout(
+            child: DashboardPage(),
           ),
           onGenerateRoute: Routes.generateRoute,
         ),

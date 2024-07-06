@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+import 'dart:math';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
@@ -23,99 +23,136 @@ class BacktestingService {
     double averageEntryPrice = 0;
     int daysSinceLastPurchase = 0;
 
+    double highestPortfolioValue = portfolioValue;
+    double lowestPortfolioValue = portfolioValue;
+    List<double> dailyReturns = [];
+    double previousPortfolioValue = portfolioValue;
+    List<Map<String, dynamic>> investmentOverTime = [];
+
     for (int i = 0; i < historicalData.length; i++) {
       HistoricalDataPoint currentData = historicalData[i];
       daysSinceLastPurchase++;
 
-      // Check for stop loss
+      double currentPortfolioValue = portfolioValue + (btcAmount * currentData.close);
+
+      if (i > 0) {
+        double dailyReturn = (currentPortfolioValue - previousPortfolioValue) / previousPortfolioValue;
+        dailyReturns.add(dailyReturn);
+      }
+      previousPortfolioValue = currentPortfolioValue;
+
+      highestPortfolioValue = max(highestPortfolioValue, currentPortfolioValue);
+      lowestPortfolioValue = min(lowestPortfolioValue, currentPortfolioValue);
+
+      investmentOverTime.add({
+        'date': currentData.timestamp,
+        'value': currentPortfolioValue,
+      });
+
       if (btcAmount > 0 &&
           currentData.close <=
               averageEntryPrice * (1 - parameters.stopLossPercentage / 100)) {
-        double sellAmount = btcAmount;
-        double sellValue = sellAmount * currentData.close;
-        portfolioValue += sellValue;
-
         trades.add(CoreTrade(
           id: (i + 2000000).toString(),
           symbol: symbol,
-          amount: sellAmount,
+          amount: btcAmount,
           price: currentData.close,
           timestamp: currentData.timestamp,
           type: CoreTradeType.sell,
         ));
 
+        portfolioValue += btcAmount * currentData.close;
         btcAmount = 0;
         averageEntryPrice = 0;
       }
 
-      // Simulate buy
       if (daysSinceLastPurchase >= parameters.purchaseFrequency) {
-        double buyAmount = parameters.investmentAmount / currentData.close;
-        btcAmount += buyAmount;
-        portfolioValue -= parameters.investmentAmount;
+        double investmentAmount = parameters.investmentAmount;
+        if (parameters.isVariableInvestmentAmount) {
+          double variationPercentage = (parameters.variableInvestmentPercentage / 100);
+          double randomFactor = 1 + (Random().nextDouble() * 2 - 1) * variationPercentage;
+          investmentAmount *= randomFactor;
+        }
 
-        // Update average entry price
-        averageEntryPrice = (averageEntryPrice * (btcAmount - buyAmount) +
-                currentData.close * buyAmount) /
-            btcAmount;
+        double buyAmount = investmentAmount / currentData.close;
+        if (parameters.useAutoMinTradeAmount) {
+          double minTradeAmount = 0.00001;
+          buyAmount = buyAmount.clamp(minTradeAmount, parameters.maxInvestmentSize);
+        } else {
+          buyAmount = buyAmount.clamp(parameters.manualMinTradeAmount, parameters.maxInvestmentSize);
+        }
 
-        trades.add(CoreTrade(
-          id: i.toString(),
-          symbol: symbol,
-          amount: buyAmount,
-          price: currentData.close,
-          timestamp: currentData.timestamp,
-          type: CoreTradeType.buy,
-        ));
+        if (portfolioValue >= buyAmount * currentData.close) {
+          btcAmount += buyAmount;
+          portfolioValue -= buyAmount * currentData.close;
 
-        daysSinceLastPurchase = 0;
+          averageEntryPrice = (averageEntryPrice * (btcAmount - buyAmount) +
+                  currentData.close * buyAmount) /
+              btcAmount;
+
+          trades.add(CoreTrade(
+            id: i.toString(),
+            symbol: symbol,
+            amount: buyAmount,
+            price: currentData.close,
+            timestamp: currentData.timestamp,
+            type: CoreTradeType.buy,
+          ));
+
+          daysSinceLastPurchase = 0;
+        }
       }
 
-      // Check for take profit
       if (btcAmount > 0 &&
           currentData.close >=
               averageEntryPrice *
                   (1 + parameters.targetProfitPercentage / 100)) {
-        double sellAmount = btcAmount;
-        double sellValue = sellAmount * currentData.close;
-        portfolioValue += sellValue;
-
         trades.add(CoreTrade(
           id: (i + 1000000).toString(),
           symbol: symbol,
-          amount: sellAmount,
+          amount: btcAmount,
           price: currentData.close,
           timestamp: currentData.timestamp,
           type: CoreTradeType.sell,
         ));
 
-        btcAmount = 0;
-        averageEntryPrice = 0;
+        double sellValue = btcAmount * currentData.close;
+        portfolioValue += sellValue;
+
+        if (parameters.reinvestProfits) {
+          double profit = sellValue - (btcAmount * averageEntryPrice);
+          double reinvestAmount = profit / currentData.close;
+          btcAmount = reinvestAmount;
+          averageEntryPrice = currentData.close;
+        } else {
+          btcAmount = 0;
+          averageEntryPrice = 0;
+        }
       }
     }
 
-    // Calculate performance metrics
-    double totalInvestment = parameters.investmentAmount *
-        (historicalData.length / parameters.purchaseFrequency);
-    double finalPortfolioValue =
-        portfolioValue + (btcAmount * historicalData.last.close);
-    double totalProfit = finalPortfolioValue - totalInvestment;
-    double winRate = trades
-            .where((t) =>
-                t.type == CoreTradeType.sell && t.price > averageEntryPrice)
-            .length /
-        trades.where((t) => t.type == CoreTradeType.sell).length;
-    double maxDrawdown = _calculateMaxDrawdown(trades, historicalData);
-    double sharpeRatio = _calculateSharpeRatio(trades, historicalData);
+    double finalPortfolioValue = portfolioValue + (btcAmount * historicalData.last.close);
+    double totalProfit = finalPortfolioValue - parameters.investmentAmount;
+    double totalReturn = totalProfit / parameters.investmentAmount;
+    double maxDrawdown = (highestPortfolioValue - lowestPortfolioValue) / highestPortfolioValue;
+
+    int profitableTrades = trades.where((t) => t.type == CoreTradeType.sell && t.price > averageEntryPrice).length;
+    double winRate = profitableTrades / trades.where((t) => t.type == CoreTradeType.sell).length;
+
+    double averageDailyReturn = dailyReturns.reduce((a, b) => a + b) / dailyReturns.length;
+    double stdDailyReturn = sqrt(dailyReturns.map((r) => pow(r - averageDailyReturn, 2)).reduce((a, b) => a + b) / dailyReturns.length);
+    double sharpeRatio = sqrt(252) * averageDailyReturn / stdDailyReturn;
 
     return BacktestResult(
       trades: trades,
       performance: BacktestPerformance(
         totalProfit: totalProfit,
-        winRate: winRate,
+        totalReturn: totalReturn,
         maxDrawdown: maxDrawdown,
+        winRate: winRate,
         sharpeRatio: sharpeRatio,
       ),
+      investmentOverTime: investmentOverTime,
     );
   }
 
@@ -138,75 +175,6 @@ class BacktestingService {
               volume: double.parse(kline[5]),
             ))
         .toList();
-  }
-
-  double _calculateMaxDrawdown(
-      List<CoreTrade> trades, List<HistoricalDataPoint> historicalData) {
-    double maxDrawdown = 0;
-    double peak = 0;
-    double currentValue = 0;
-
-    for (var data in historicalData) {
-      currentValue =
-          trades
-              .where((t) => t.timestamp.isBefore(data.timestamp))
-              .fold(
-                  0,
-                  (sum, trade) =>
-                      sum +
-                      (trade.type == CoreTradeType.buy
-                          ? -trade.amount * trade.price
-                          : trade.amount * trade.price));
-
-      if (currentValue > peak) {
-        peak = currentValue;
-      }
-
-      double drawdown = (peak - currentValue) / peak;
-      if (drawdown > maxDrawdown) {
-        maxDrawdown = drawdown;
-      }
-    }
-
-    return maxDrawdown;
-  }
-
-  double _calculateSharpeRatio(
-      List<CoreTrade> trades, List<HistoricalDataPoint> historicalData) {
-    List<double> returns = [];
-    double previousValue = 0;
-
-    for (var data in historicalData) {
-      double currentValue = trades
-          .where((t) => t.timestamp.isBefore(data.timestamp))
-          .fold(
-              0,
-              (sum, trade) =>
-                  sum +
-                  (trade.type == CoreTradeType.buy
-                      ? -trade.amount * trade.price
-                      : trade.amount * trade.price));
-
-      if (previousValue != 0) {
-        returns.add((currentValue - previousValue) / previousValue);
-      }
-
-      previousValue = currentValue;
-    }
-
-    double averageReturn = returns.reduce((a, b) => a + b) / returns.length;
-    double stdDev = _calculateStandardDeviation(returns);
-
-    // Assuming risk-free rate is 0 for simplicity
-    return averageReturn / stdDev * math.sqrt(252); // Annualized Sharpe Ratio
-  }
-
-  double _calculateStandardDeviation(List<double> values) {
-    double mean = values.reduce((a, b) => a + b) / values.length;
-    num squaredDifferencesSum = values
-        .map((value) => math.pow(value - mean, 2))
-        .reduce((a, b) => a + b);
-    return math.sqrt(squaredDifferencesSum / (values.length - 1));
   }
 }
 
@@ -231,20 +199,27 @@ class HistoricalDataPoint {
 class BacktestResult {
   final List<CoreTrade> trades;
   final BacktestPerformance performance;
+  final List<Map<String, dynamic>> investmentOverTime;
 
-  BacktestResult({required this.trades, required this.performance});
+  BacktestResult({
+    required this.trades,
+    required this.performance,
+    required this.investmentOverTime,
+  });
 }
 
 class BacktestPerformance {
   final double totalProfit;
-  final double winRate;
+  final double totalReturn;
   final double maxDrawdown;
+  final double winRate;
   final double sharpeRatio;
 
   BacktestPerformance({
     required this.totalProfit,
-    required this.winRate,
+    required this.totalReturn,
     required this.maxDrawdown,
+    required this.winRate,
     required this.sharpeRatio,
   });
 }

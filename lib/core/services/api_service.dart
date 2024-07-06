@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
 
@@ -20,6 +21,34 @@ class ApiService {
       }
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<double> getAccountBalance(String asset) async {
+    try {
+      final accountInfo = await getAccountInfo();
+      final balances = accountInfo['balances'] as List<dynamic>;
+      final assetBalance = balances.firstWhere(
+        (balance) => balance['asset'] == asset,
+        orElse: () => {'free': '0'},
+      );
+      return double.parse(assetBalance['free']);
+    } catch (e) {
+      throw Exception('Failed to get account balance: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createMarketSellOrder(String symbol, double quantity) async {
+    try {
+      final response = await createOrder(
+        symbol: symbol,
+        side: 'SELL',
+        type: 'MARKET',
+        quantity: quantity.toStringAsFixed(8),
+      );
+      return response;
+    } catch (e) {
+      throw Exception('Failed to create market sell order: $e');
     }
   }
 
@@ -242,5 +271,66 @@ class ApiService {
       if (network != null) 'network': network,
     };
     return await post('/sapi/v1/capital/withdraw/apply', body);
+  }
+
+  Future<double> getMinimumTradeAmount(String symbol) async {
+    try {
+      final response = await get('/api/v3/exchangeInfo',
+          queryParams: {'symbol': symbol}, requiresAuth: false);
+      final filters = response['symbols'][0]['filters'] as List<dynamic>;
+      final lotSizeFilter =
+          filters.firstWhere((filter) => filter['filterType'] == 'LOT_SIZE');
+      return double.parse(lotSizeFilter['minQty']);
+    } catch (e) {
+      // In caso di errore, restituisci un valore di default
+      return 0.00001; // Questo è un valore arbitrario, regolalo secondo le tue esigenze
+    }
+  }
+
+  Stream<double> getPriceStream(String symbol) async* {
+    final ws = await WebSocket.connect(
+        'wss://stream.binance.com:9443/ws/$symbol@trade');
+
+    try {
+      await for (var message in ws) {
+        final data = json.decode(message);
+        yield double.parse(data['p']);
+      }
+    } finally {
+      await ws.close();
+    }
+  }
+
+  Future<String> createMarketBuyOrder(String symbol, double quantity) async {
+    return await createOrder(
+      symbol: symbol,
+      side: 'BUY',
+      type: 'MARKET',
+      quantity: quantity.toStringAsFixed(8),
+    );
+  }
+
+
+
+  Future<String> createLimitBuyOrder(
+      String symbol, double quantity, double price) async {
+    return await createOrder(
+      symbol: symbol,
+      side: 'BUY',
+      type: 'LIMIT',
+      quantity: quantity.toStringAsFixed(8),
+      price: price.toStringAsFixed(8),
+    );
+  }
+
+  Future<String> createLimitSellOrder(
+      String symbol, double quantity, double price) async {
+    return await createOrder(
+      symbol: symbol,
+      side: 'SELL',
+      type: 'LIMIT',
+      quantity: quantity.toStringAsFixed(8),
+      price: price.toStringAsFixed(8),
+    );
   }
 }

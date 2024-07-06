@@ -6,7 +6,8 @@ import 'package:cost_averaging_trading_app/features/portfolio/ui/pages/portfolio
 import 'package:cost_averaging_trading_app/features/settings/ui/pages/settings_page.dart';
 import 'package:cost_averaging_trading_app/features/strategy/ui/pages/strategy_page.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/ui/pages/trade_history_page.dart';
-import 'package:cost_averaging_trading_app/ui/layouts/main_layout.dart'; // Aggiungi questa importazione
+import 'package:cost_averaging_trading_app/ui/layouts/main_layout.dart';
+// Aggiungi questa importazione
 
 class Routes {
   static const String dashboard = '/';
@@ -25,7 +26,8 @@ class Routes {
             builder: (_) => const MainLayout(child: PortfolioPage()));
       case strategy:
         return MaterialPageRoute(
-            builder: (_) => const MainLayout(child: StrategyPage()));
+          builder: (_) => const MainLayout(child: StrategyPage()),
+        );
       case tradeHistory:
         return MaterialPageRoute(
             builder: (_) => const MainLayout(child: TradeHistoryPage()));

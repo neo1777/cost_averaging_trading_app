@@ -1,61 +1,72 @@
-import 'dart:async';
-
-import 'package:cost_averaging_trading_app/core/services/risk_management_service.dart';
+import 'package:cost_averaging_trading_app/core/services/trading_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
-import 'package:cost_averaging_trading_app/features/settings/repositories/settings_repository.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_event.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
 import 'package:cost_averaging_trading_app/features/strategy/repositories/strategy_repository.dart';
+import 'package:cost_averaging_trading_app/core/services/risk_management_service.dart';
+import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
 
 class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
   final StrategyRepository _strategyRepository;
-  final SettingsRepository _settingsRepository;
-  final BacktestingService _backtestingService;
   final RiskManagementService _riskManagementService;
+  final BacktestingService _backtestingService;
+  final TradingService _tradingService;
 
   StrategyBloc(
     this._strategyRepository,
-    this._settingsRepository,
-    this._backtestingService,
     this._riskManagementService,
+    this._backtestingService,
+    this._tradingService,
   ) : super(StrategyInitial()) {
     on<LoadStrategyData>(_onLoadStrategyData);
     on<UpdateStrategyParameters>(_onUpdateStrategyParameters);
-    on<UpdateStrategyStatus>(_onUpdateStrategyStatus);
+    on<StartStrategyEvent>(_onStartStrategy);
+    on<StopStrategyEvent>(_onStopStrategy);
     on<RunBacktestEvent>(_onRunBacktest);
     on<StartDemoStrategy>(_onStartDemoStrategy);
     on<StartLiveStrategy>(_onStartLiveStrategy);
-    on<StopStrategy>(_onStopStrategy);
     on<ForceStartStrategy>(_onForceStartStrategy);
     on<SellEntirePortfolio>(_onSellEntirePortfolio);
+    on<UpdateUseAutoMinTradeAmount>(_onUpdateUseAutoMinTradeAmount);
+    on<UpdateManualMinTradeAmount>(_onUpdateManualMinTradeAmount);
+    on<UpdateIsVariableInvestmentAmount>(_onUpdateIsVariableInvestmentAmount);
+    on<UpdateVariableInvestmentPercentage>(
+        _onUpdateVariableInvestmentPercentage);
+    on<UpdateReinvestProfits>(_onUpdateReinvestProfits);
+    on<StartMonitoring>(_onStartMonitoring);
+    on<StopMonitoring>(_onStopMonitoring);
+    on<UpdateMonitoringData>(_onUpdateMonitoringData);
+
+    // Carica i dati iniziali automaticamente
+    add(LoadStrategyData());
   }
 
   Future<void> _onLoadStrategyData(
     LoadStrategyData event,
     Emitter<StrategyState> emit,
   ) async {
-    emit(StrategyLoading());
     try {
+      emit(StrategyLoading());
       final parameters = await _strategyRepository.getStrategyParameters();
       final status = await _strategyRepository.getStrategyStatus();
       final chartData = await _strategyRepository.getStrategyChartData();
-      final settings = await _settingsRepository.getSettings();
-
-      final riskManagementSettings = RiskManagementSettings(
-        maxLossPercentage: settings.maxLossPercentage,
-        maxConcurrentTrades: settings.maxConcurrentTrades,
-        maxPositionSizePercentage: settings.maxPositionSizePercentage,
-        dailyExposureLimit: settings.dailyExposureLimit,
-        maxAllowedVolatility: settings.maxAllowedVolatility,
-        maxRebuyCount: settings.maxRebuyCount,
-      );
+      final riskManagementSettings =
+          await _riskManagementService.getRiskManagementSettings();
+      final statistics = await _strategyRepository.getStrategyStatistics();
+      final recentTrades = await _strategyRepository.getRecentTrades(10);
 
       emit(StrategyLoaded(
         parameters: parameters,
         status: status,
         chartData: chartData,
         riskManagementSettings: riskManagementSettings,
+        totalInvested: statistics['totalInvested'] ?? 0,
+        currentProfit: statistics['totalProfit'] ?? 0,
+        tradeCount: statistics['totalTrades'] ?? 0,
+        averageBuyPrice: statistics['averageBuyPrice'] ?? 0,
+        currentMarketPrice:
+            await _tradingService.getCurrentPrice(parameters.symbol),
+        recentTrades: recentTrades,
       ));
     } catch (e) {
       emit(StrategyError('Failed to load strategy data: ${e.toString()}'));
@@ -69,13 +80,8 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
       try {
-        await _strategyRepository.updateStrategyParameters(event.parameters);
-        emit(StrategyLoaded(
-          parameters: event.parameters,
-          status: currentState.status,
-          chartData: currentState.chartData,
-          riskManagementSettings: currentState.riskManagementSettings,
-        ));
+        await _strategyRepository.saveStrategyParameters(event.parameters);
+        emit(currentState.copyWith(parameters: event.parameters));
       } catch (e) {
         emit(StrategyError(
             'Failed to update strategy parameters: ${e.toString()}'));
@@ -83,53 +89,75 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
     }
   }
 
-  Future<void> _onUpdateStrategyStatus(
-    UpdateStrategyStatus event,
+  Future<void> _onStartStrategy(
+    StartStrategyEvent event,
     Emitter<StrategyState> emit,
   ) async {
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
       try {
-        await _strategyRepository.saveStrategyStatus(event.status);
-        emit(StrategyLoaded(
-          parameters: currentState.parameters,
-          status: event.status,
-          chartData: currentState.chartData,
-          riskManagementSettings: currentState.riskManagementSettings,
-        ));
+        final isStrategySafe = await _riskManagementService
+            .isStrategySafe(currentState.parameters);
+        if (isStrategySafe) {
+          await _strategyRepository
+              .updateStrategyStatus(StrategyStateStatus.active);
+          emit(currentState.copyWith(status: StrategyStateStatus.active));
+        } else {
+          emit(StrategyUnsafe(
+            message:
+                'Strategy is not safe to start based on current risk management settings.',
+            parameters: currentState.parameters,
+            status: currentState.status,
+            chartData: currentState.chartData,
+            riskManagementSettings: currentState.riskManagementSettings,
+            isNowDemo: false,
+          ));
+        }
       } catch (e) {
-        emit(
-            StrategyError('Failed to update strategy status: ${e.toString()}'));
+        emit(StrategyError('Failed to start strategy: ${e.toString()}'));
       }
     }
   }
 
-Future<void> _onRunBacktest(
-  RunBacktestEvent event,
-  Emitter<StrategyState> emit,
-) async {
-  if (state is StrategyLoaded) {
-    final currentState = state as StrategyLoaded;
-    emit(StrategyLoading());
-    try {
-      final backtestResult = await _backtestingService.runBacktest(
-        currentState.parameters.symbol,
-        event.startDate,
-        event.endDate,
-        currentState.parameters,
-      );
-      emit(StrategyLoaded(
-        parameters: currentState.parameters,
-        status: currentState.status,
-        chartData: currentState.chartData,
-        riskManagementSettings: currentState.riskManagementSettings,
-        backtestResult: backtestResult,
-      ));
-    } catch (e) {
-      emit(StrategyError('Failed to run backtest: ${e.toString()}'));
+  Future<void> _onStopStrategy(
+    StopStrategyEvent event,
+    Emitter<StrategyState> emit,
+  ) async {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      try {
+        await _strategyRepository
+            .updateStrategyStatus(StrategyStateStatus.inactive);
+        emit(currentState.copyWith(status: StrategyStateStatus.inactive));
+      } catch (e) {
+        emit(StrategyError('Failed to stop strategy: ${e.toString()}'));
+      }
     }
   }
-}
+
+  Future<void> _onRunBacktest(
+    RunBacktestEvent event,
+    Emitter<StrategyState> emit,
+  ) async {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      try {
+        emit(currentState.copyWith(status: StrategyStateStatus.backtesting));
+        final backtestResult = await _backtestingService.runBacktest(
+          currentState.parameters.symbol,
+          event.startDate,
+          event.endDate,
+          currentState.parameters,
+        );
+        emit(currentState.copyWith(
+          status: StrategyStateStatus.inactive,
+          backtestResult: backtestResult,
+        ));
+      } catch (e) {
+        emit(StrategyError('Failed to run backtest: ${e.toString()}'));
+      }
+    }
+  }
 
   Future<void> _onStartDemoStrategy(
     StartDemoStrategy event,
@@ -138,22 +166,11 @@ Future<void> _onRunBacktest(
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
       try {
-        bool isStrategySafe = await _riskManagementService
-            .isStrategySafe(currentState.parameters);
-        if (!isStrategySafe) {
-          emit(StrategyUnsafe(
-            message:
-                'Strategy is not safe to start based on current risk management settings.',
-            parameters: currentState.parameters,
-            status: currentState.status,
-            chartData: currentState.chartData,
-            riskManagementSettings: currentState.riskManagementSettings,
-            isDemo: true,
-          ));
-          return;
-        }
-
-        await _startStrategy(currentState, isDemo: true, emit: emit);
+        await _strategyRepository
+            .updateStrategyStatus(StrategyStateStatus.active);
+        // Implementa la logica specifica per la modalità demo
+        emit(currentState.copyWith(
+            status: StrategyStateStatus.active, isDemo: true));
       } catch (e) {
         emit(StrategyError('Failed to start demo strategy: ${e.toString()}'));
       }
@@ -167,82 +184,43 @@ Future<void> _onRunBacktest(
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
       try {
-        bool isStrategySafe = await _riskManagementService
+        final isStrategySafe = await _riskManagementService
             .isStrategySafe(currentState.parameters);
-        if (!isStrategySafe) {
+        if (isStrategySafe) {
+          await _strategyRepository
+              .updateStrategyStatus(StrategyStateStatus.active);
+          emit(currentState.copyWith(
+              status: StrategyStateStatus.active, isDemo: false));
+        } else {
           emit(StrategyUnsafe(
             message:
-                'Strategy is not safe to start based on current risk management settings.',
+                'Strategy is not safe to start in live mode based on current risk management settings.',
             parameters: currentState.parameters,
             status: currentState.status,
             chartData: currentState.chartData,
             riskManagementSettings: currentState.riskManagementSettings,
-            isDemo: false,
+            isNowDemo: false,
           ));
-          return;
         }
-
-        await _startStrategy(currentState, isDemo: false, emit: emit);
       } catch (e) {
         emit(StrategyError('Failed to start live strategy: ${e.toString()}'));
       }
     }
   }
 
-  Future<void> _startStrategy(StrategyLoaded currentState,
-      {required bool isDemo, required Emitter<StrategyState> emit}) async {
-    try {
-      if (isDemo) {
-        await _strategyRepository.startDemoStrategy(currentState.parameters);
-      } else {
-        await _strategyRepository.startLiveStrategy(currentState.parameters);
-      }
-      emit(StrategyLoaded(
-        parameters: currentState.parameters,
-        status: StrategyStateStatus.active,
-        chartData: currentState.chartData,
-        riskManagementSettings: currentState.riskManagementSettings,
-      ));
-    } catch (e) {
-      if (e.toString().contains('Trade not allowed')) {
-        emit(const StrategyError(
-            'Strategy not started: Trade not allowed due to risk limits'));
-      } else {
-        emit(StrategyError('Failed to start strategy: ${e.toString()}'));
-      }
-    }
-  }
-
-  // Add this new event handler
   Future<void> _onForceStartStrategy(
     ForceStartStrategy event,
-    Emitter<StrategyState> emit,
-  ) async {
-    if (state is StrategyUnsafe) {
-      final currentState = state as StrategyUnsafe;
-      await _startStrategy(currentState,
-          isDemo: currentState.isDemo, emit: emit);
-    }
-  }
-
-  Future<void> _onStopStrategy(
-    StopStrategy event,
     Emitter<StrategyState> emit,
   ) async {
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
       try {
-        await _strategyRepository.stopStrategy();
-        emit(StrategyLoaded(
-          parameters: currentState.parameters,
-          status: StrategyStateStatus.inactive,
-          chartData: currentState.chartData,
-          riskManagementSettings: currentState.riskManagementSettings,
-        ));
+        await _strategyRepository
+            .updateStrategyStatus(StrategyStateStatus.active);
+        emit(currentState.copyWith(status: StrategyStateStatus.active));
       } catch (e) {
-        emit(StrategyError('Failed to stop strategy: ${e.toString()}'));
+        emit(StrategyError('Failed to force start strategy: ${e.toString()}'));
       }
-    } else {
     }
   }
 
@@ -250,20 +228,141 @@ Future<void> _onRunBacktest(
     SellEntirePortfolio event,
     Emitter<StrategyState> emit,
   ) async {
+    try {
+      emit(StrategyLoading()); // Emettiamo uno stato di caricamento
+
+      await _strategyRepository.sellEntirePortfolio(
+        event.symbol,
+        event.targetProfit,
+        _tradingService,
+      );
+
+      // Otteniamo le statistiche aggiornate dopo la vendita
+      final updatedStatistics =
+          await _strategyRepository.getStrategyStatistics();
+
+      // Emettiamo lo stato appropriato dopo la vendita
+      emit(StrategyLoaded(
+        parameters: (state as StrategyLoaded).parameters,
+        status: StrategyStateStatus
+            .inactive, // Assumiamo che la strategia sia ora inattiva
+        chartData: (state as StrategyLoaded).chartData,
+        riskManagementSettings:
+            (state as StrategyLoaded).riskManagementSettings,
+        totalInvested:
+            0, // Il portafoglio è stato venduto, quindi l'investimento è 0
+        currentProfit: updatedStatistics['totalProfit'] ?? 0,
+        tradeCount: updatedStatistics['totalTrades'] ?? 0,
+        averageBuyPrice: 0, // Non c'è più un prezzo medio di acquisto
+        currentMarketPrice: await _tradingService.getCurrentPrice(event.symbol),
+        recentTrades: await _strategyRepository
+            .getRecentTrades(10), // Aggiorniamo le trade recenti
+      ));
+
+      // Potremmo anche voler emettere un evento di successo o mostrare una notifica
+      // all'utente che la vendita è stata completata con successo
+    } catch (e) {
+      // Gestiamo l'errore e emettiamo lo stato appropriato
+      emit(StrategyError('Failed to sell entire portfolio: ${e.toString()}'));
+
+      // Potremmo anche voler loggare l'errore o mostrare una notifica all'utente
+    }
+  }
+
+  void _onUpdateUseAutoMinTradeAmount(
+    UpdateUseAutoMinTradeAmount event,
+    Emitter<StrategyState> emit,
+  ) {
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
-      try {
-        await _strategyRepository.sellEntirePortfolio(
-            event.symbol, event.targetProfit);
-        emit(StrategyLoaded(
-          parameters: currentState.parameters,
-          status: StrategyStateStatus.inactive,
-          chartData: currentState.chartData,
-          riskManagementSettings: currentState.riskManagementSettings,
-        ));
-      } catch (e) {
-        emit(StrategyError('Failed to sell entire portfolio: ${e.toString()}'));
-      }
+      final updatedParameters = currentState.parameters.copyWith(
+        useAutoMinTradeAmount: event.useAutoMinTradeAmount,
+      );
+      emit(currentState.copyWith(parameters: updatedParameters));
+    }
+  }
+
+  void _onUpdateManualMinTradeAmount(
+    UpdateManualMinTradeAmount event,
+    Emitter<StrategyState> emit,
+  ) {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      final updatedParameters = currentState.parameters.copyWith(
+        manualMinTradeAmount: event.manualMinTradeAmount,
+      );
+      emit(currentState.copyWith(parameters: updatedParameters));
+    }
+  }
+
+  void _onUpdateIsVariableInvestmentAmount(
+    UpdateIsVariableInvestmentAmount event,
+    Emitter<StrategyState> emit,
+  ) {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      final updatedParameters = currentState.parameters.copyWith(
+        isVariableInvestmentAmount: event.isVariableInvestmentAmount,
+      );
+      emit(currentState.copyWith(parameters: updatedParameters));
+    }
+  }
+
+  void _onUpdateVariableInvestmentPercentage(
+    UpdateVariableInvestmentPercentage event,
+    Emitter<StrategyState> emit,
+  ) {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      final updatedParameters = currentState.parameters.copyWith(
+        variableInvestmentPercentage: event.variableInvestmentPercentage,
+      );
+      emit(currentState.copyWith(parameters: updatedParameters));
+    }
+  }
+
+  void _onUpdateReinvestProfits(
+    UpdateReinvestProfits event,
+    Emitter<StrategyState> emit,
+  ) {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      final updatedParameters = currentState.parameters.copyWith(
+        reinvestProfits: event.reinvestProfits,
+      );
+      emit(currentState.copyWith(parameters: updatedParameters));
+    }
+  }
+
+  Future<void> _onStartMonitoring(
+    StartMonitoring event,
+    Emitter<StrategyState> emit,
+  ) async {
+    // Implementa la logica per iniziare il monitoraggio
+  }
+
+  Future<void> _onStopMonitoring(
+    StopMonitoring event,
+    Emitter<StrategyState> emit,
+  ) async {
+    // Implementa la logica per fermare il monitoraggio
+  }
+
+  void _onUpdateMonitoringData(
+    UpdateMonitoringData event,
+    Emitter<StrategyState> emit,
+  ) {
+    if (state is StrategyLoaded) {
+      final currentState = state as StrategyLoaded;
+      emit(currentState.copyWith(
+        totalInvested: event.totalInvested ?? currentState.totalInvested,
+        currentProfit: event.currentProfit ?? currentState.currentProfit,
+        tradeCount: event.tradeCount ?? currentState.tradeCount,
+        averageBuyPrice: event.averageBuyPrice ?? currentState.averageBuyPrice,
+        currentMarketPrice:
+            event.currentMarketPrice ?? currentState.currentMarketPrice,
+        recentTrades: event.recentTrades ?? currentState.recentTrades,
+      ));
     }
   }
 }

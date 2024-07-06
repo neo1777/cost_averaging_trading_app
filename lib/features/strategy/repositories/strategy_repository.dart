@@ -1,45 +1,117 @@
-import 'package:cost_averaging_trading_app/core/models/strategy_execution_result.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
+import 'package:cost_averaging_trading_app/core/services/trading_service.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_state.dart';
-import 'package:cost_averaging_trading_app/core/services/trading_service.dart';
+import 'package:cost_averaging_trading_app/core/models/trade.dart';
 
 class StrategyRepository {
   final DatabaseService databaseService;
-  final TradingService tradingService;
 
-  StrategyRepository(
-      {required this.databaseService, required this.tradingService});
+  StrategyRepository({
+    required this.databaseService,
+  });
 
-  Future<void> initializeStrategyStatus() async {
+  Future<void> saveStrategyParameters(StrategyParameters params) async {
     try {
-      final existingStatus = await databaseService.query('strategy_status');
-      if (existingStatus.isEmpty) {
-        await databaseService.insert('strategy_status', {'status': 'inactive'});
-      }
+      await databaseService.saveStrategyParameters(params);
     } catch (e) {
-      throw Exception('Failed initialize strategy: $e');
+      throw Exception('Failed to save strategy parameters: $e');
     }
+  }
+
+  Future<void> sellEntirePortfolio(String symbol, double targetProfit, TradingService tradingService) async {
+    await tradingService.sellEntirePortfolio(symbol, targetProfit);
   }
 
   Future<StrategyParameters> getStrategyParameters() async {
     try {
-      final data = await databaseService.query('strategy_parameters');
-      if (data.isNotEmpty) {
-        return StrategyParameters.fromJson(data.first);
-      }
-      // Return default parameters if none are saved
-      return StrategyParameters(
-        symbol: 'BTCUSDT',
-        investmentAmount: 100.0,
-        intervalDays: 7,
-        targetProfitPercentage: 5.0,
-        stopLossPercentage: 3.0,
-        purchaseFrequency: 1,
-        maxInvestmentSize: 1000.0,
-      );
+      final params = await databaseService.getStrategyParameters();
+      return params ??
+          StrategyParameters(
+            symbol: 'BTCUSDT',
+            investmentAmount: 100.0,
+            intervalDays: 7,
+            targetProfitPercentage: 5.0,
+            stopLossPercentage: 3.0,
+            purchaseFrequency: 1,
+            maxInvestmentSize: 1000.0,
+            useAutoMinTradeAmount: true,
+            manualMinTradeAmount: 10.0,
+            isVariableInvestmentAmount: false,
+            variableInvestmentPercentage: 10.0,
+            reinvestProfits: false,
+          );
     } catch (e) {
       throw Exception('Failed to get strategy parameters: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getStrategyStatistics() async {
+    try {
+      final trades = await databaseService.query('trades');
+
+      int totalTrades = trades.length;
+      int profitableTrades = trades
+          .where((t) => (t['price'] as num) > (t['averageEntryPrice'] as num))
+          .length;
+      double totalProfit = trades.fold(
+          0.0,
+          (sum, t) =>
+              sum +
+              ((t['price'] as num) - (t['averageEntryPrice'] as num)) *
+                  (t['amount'] as num));
+      double winRate = totalTrades > 0 ? profitableTrades / totalTrades : 0;
+
+      int variableInvestmentTrades =
+          trades.where((t) => t['isVariableInvestment'] == 1).length;
+
+      double totalReinvestedProfit = trades
+          .where((t) => t['reinvestedProfit'] != null)
+          .fold(0.0, (sum, t) => sum + (t['reinvestedProfit'] as num));
+
+      return {
+        'totalTrades': totalTrades,
+        'profitableTrades': profitableTrades,
+        'totalProfit': totalProfit,
+        'winRate': winRate,
+        'variableInvestmentTrades': variableInvestmentTrades,
+        'totalReinvestedProfit': totalReinvestedProfit,
+      };
+    } catch (e) {
+      throw Exception('Failed to get strategy statistics: $e');
+    }
+  }
+
+  Future<List<CoreTrade>> getRecentTrades(int limit) async {
+    try {
+      final trades = await databaseService.query('trades',
+          orderBy: 'timestamp DESC', limit: limit);
+
+      return trades.map((t) => CoreTrade.fromJson(t)).toList();
+    } catch (e) {
+      throw Exception('Failed to get recent trades: $e');
+    }
+  }
+
+  Future<void> saveTradeWithNewFields(CoreTrade trade,
+      bool isVariableInvestment, double? reinvestedProfit) async {
+    try {
+      Map<String, dynamic> tradeData = trade.toJson();
+      tradeData['isVariableInvestment'] = isVariableInvestment ? 1 : 0;
+      tradeData['reinvestedProfit'] = reinvestedProfit;
+
+      await databaseService.insert('trades', tradeData);
+    } catch (e) {
+      throw Exception('Failed to save trade with new fields: $e');
+    }
+  }
+
+  Future<void> updateStrategyStatus(StrategyStateStatus status) async {
+    try {
+      await databaseService.update(
+          'strategy_status', {'status': status.toString().split('.').last});
+    } catch (e) {
+      throw Exception('Failed to update strategy status: $e');
     }
   }
 
@@ -48,122 +120,30 @@ class StrategyRepository {
       final result = await databaseService.query('strategy_status');
       if (result.isNotEmpty) {
         return StrategyStateStatus.values.firstWhere(
-          (e) =>
-              e.toString() == 'StrategyStateStatus.${result.first['status']}',
+          (e) => e.toString().split('.').last == result.first['status'],
           orElse: () => StrategyStateStatus.inactive,
         );
       }
       return StrategyStateStatus.inactive;
     } catch (e) {
-      // Se la tabella non esiste, inserisci uno stato predefinito
-      await databaseService.insert('strategy_status', {'status': 'inactive'});
-      return StrategyStateStatus.inactive;
-    }
-  }
-
-  Future<void> saveStrategyStatus(StrategyStateStatus status) async {
-    try {
-      final statusString = status.toString().split('.').last;
-      final existingStatus = await databaseService.query('strategy_status');
-      if (existingStatus.isEmpty) {
-        await databaseService
-            .insert('strategy_status', {'status': statusString});
-      } else {
-        await databaseService
-            .update('strategy_status', {'status': statusString});
-      }
-    } catch (e) {
-      throw Exception('Failed to save strategy status: $e');
+      throw Exception('Failed to get strategy status: $e');
     }
   }
 
   Future<List<Map<String, dynamic>>> getStrategyChartData() async {
-    // This is a placeholder. In a real application, you'd fetch this data from your database or an API
-    return [
-      {
-        'date': DateTime.now().subtract(const Duration(days: 30)),
-        'value': 30000
-      },
-      {
-        'date': DateTime.now().subtract(const Duration(days: 20)),
-        'value': 32000
-      },
-      {
-        'date': DateTime.now().subtract(const Duration(days: 10)),
-        'value': 31000
-      },
-      {'date': DateTime.now(), 'value': 33000},
-    ];
-  }
-
-  Future<void> updateStrategyParameters(StrategyParameters parameters) async {
     try {
-      await databaseService.insert('strategy_parameters', parameters.toJson());
-    } catch (e) {
-      throw Exception('Failed to update strategy parameters: $e');
-    }
-  }
+      final trades = await databaseService.query('trades',
+          orderBy: 'timestamp DESC', limit: 100);
 
-  Future<void> startDemoStrategy(StrategyParameters parameters) async {
-    try {
-      tradingService.setDemoMode(true);
-
-      final result = await tradingService.executeStrategy(parameters);
-      switch (result) {
-        case StrategyExecutionResult.success:
-          await saveStrategyStatus(StrategyStateStatus.active);
-          break;
-        case StrategyExecutionResult.tradeNotAllowed:
-          // Potremmo voler gestire questo caso in modo specifico, ad esempio notificando l'utente
-          break;
-        case StrategyExecutionResult.insufficientTime:
-          // Anche qui, potremmo voler gestire questo caso in modo specifico
-          break;
-        case StrategyExecutionResult.error:
-          throw Exception('Error occurred during strategy execution');
-        case StrategyExecutionResult.stopLossTriggered:
-      }
+      return trades.map((trade) {
+        return {
+          'date':
+              DateTime.fromMillisecondsSinceEpoch(trade['timestamp'] as int),
+          'value': trade['price'],
+        };
+      }).toList();
     } catch (e) {
-      throw Exception('Error in strategy execution: $e');
-    }
-  }
-
-  Future<void> startLiveStrategy(StrategyParameters parameters) async {
-    try {
-      tradingService.setDemoMode(false);
-      final result = await tradingService.executeStrategy(parameters);
-      if (result == StrategyExecutionResult.success) {
-        await saveStrategyStatus(StrategyStateStatus.active);
-      } else {
-        throw Exception('Failed to start live strategy: ${result.message}');
-      }
-    } catch (e) {
-      throw Exception('Failed to start live strategy: $e');
-    }
-  }
-
-  Future<void> stopStrategy() async {
-    try {
-      final existingStatus = await databaseService.query('strategy_status');
-      if (existingStatus.isEmpty) {
-        await databaseService.insert('strategy_status', {'status': 'inactive'});
-      } else {
-        await databaseService.update(
-          'strategy_status',
-          {'status': 'inactive'},
-        );
-      }
-      await tradingService.stopStrategy();
-    } catch (e) {
-      throw Exception('Failed to stop strategy: $e');
-    }
-  }
-
-  Future<void> sellEntirePortfolio(String symbol, double targetProfit) async {
-    try {
-      await tradingService.sellEntirePortfolio(symbol, targetProfit);
-    } catch (e) {
-      throw Exception('Failed to sell entire portfolio: $e');
+      throw Exception('Failed to get strategy chart data: $e');
     }
   }
 }

@@ -1,333 +1,232 @@
-import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
-import 'package:cost_averaging_trading_app/core/models/strategy_execution_result.dart';
+import 'dart:math';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
-import 'package:cost_averaging_trading_app/core/services/risk_management_service.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+import 'package:cost_averaging_trading_app/features/strategy/repositories/strategy_repository.dart';
 
 class TradingService {
   final ApiService _apiService;
   final DatabaseService _databaseService;
-  final RiskManagementService _riskManagementService;
-  bool _isDemoMode = false;
+  final StrategyRepository _strategyRepository;
 
   TradingService(
-      this._apiService, this._databaseService, this._riskManagementService);
+    this._apiService,
+    this._databaseService,
+    this._strategyRepository,
+  );
 
-  void setDemoMode(bool isDemoMode) {
-    _isDemoMode = isDemoMode;
-  }
-
-  Future<void> executeTrade(CoreTrade trade) async {
+  Future<double> getCurrentPrice(String symbol) async {
     try {
-      if (_isDemoMode) {
-        await _executeDemoTrade(trade);
-      } else {
-        await _executeLiveTrade(trade);
-      }
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to execute trade', e, stackTrace);
-      rethrow;
-    }
-  }
+      // Tenta di ottenere il prezzo corrente dall'API
+      final price = await _apiService.getCurrentPrice(symbol);
 
-  Future<void> _executeDemoTrade(CoreTrade trade) async {
-    try {
-      double currentPrice = await _apiService.getCurrentPrice(trade.symbol);
-      trade = trade.copyWith(price: currentPrice);
-      await _databaseService.insert('trades', trade.toJson());
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to execute demo trade', e, stackTrace);
-      throw Exception('Error in demo trade execution');
-    }
-  }
+      // Salva il prezzo nel database locale per uso futuro
+      await _databaseService.insert('price_history', {
+        'symbol': symbol,
+        'price': price,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
 
-  Future<void> _executeLiveTrade(CoreTrade trade) async {
-    try {
-      await _apiService.createOrder(
-        symbol: trade.symbol,
-        side: trade.type == CoreTradeType.buy ? 'BUY' : 'SELL',
-        type: 'MARKET',
-        quantity: trade.amount.toString(),
-      );
-      await _databaseService.insert('trades', trade.toJson());
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to execute live trade', e, stackTrace);
-      throw Exception('Error in live trade execution');
-    }
-  }
+      return price;
+    } catch (e) {
 
-  Future<StrategyExecutionResult> executeStrategy(
-      StrategyParameters params) async {
-    try {
+      // Se fallisce l'API, prova a ottenere l'ultimo prezzo salvato dal database
+      try {
+        final latestPrice = await _databaseService.query(
+          'price_history',
+          where: 'symbol = ?',
+          whereArgs: [symbol],
+          orderBy: 'timestamp DESC',
+          limit: 1,
+        );
 
-      final lastPurchaseDate = await _getLastPurchaseDate(params.symbol);
-      double currentPrice = await _apiService.getCurrentPrice(params.symbol);
+        if (latestPrice.isNotEmpty) {
+          return latestPrice.first['price'];
+        }
+      } catch (dbError) {
+              throw Exception('dbError: $dbError');
 
-      final now = DateTime.now();
-      if (lastPurchaseDate != null &&
-          now.difference(lastPurchaseDate).inDays < params.purchaseFrequency) {
-        return StrategyExecutionResult.insufficientTime;
       }
 
-      Portfolio portfolio = await _getPortfolio(params.symbol);
-
-      double averageEntryPrice = portfolio.averagePrice;
-
-      if (currentPrice <=
-          averageEntryPrice * (1 - params.stopLossPercentage / 100)) {
-        await sellEntirePortfolio(params.symbol, 0); // Vendere immediatamente
-        return StrategyExecutionResult.stopLossTriggered;
-      }
-      double minimumTradableAmount =
-          calculateMinimumTradableAmount(currentPrice, params.investmentAmount);
-      double amountToBuy =
-          minimumTradableAmount.clamp(0, params.maxInvestmentSize);
-
-      double currentPortfolioValue = await _getCurrentPortfolioValue();
-      bool isTradeAllowed = await _riskManagementService.isCoreTradeAllowed(
-        CoreTrade(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          symbol: params.symbol,
-          amount: amountToBuy,
-          price: currentPrice,
-          timestamp: now,
-          type: CoreTradeType.buy,
-        ),
-        currentPortfolioValue,
-      );
-
-      if (!isTradeAllowed) {
-        return StrategyExecutionResult.tradeNotAllowed;
-      }
-
-      CoreTrade trade = CoreTrade(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        symbol: params.symbol,
-        amount: amountToBuy,
-        price: currentPrice,
-        timestamp: now,
-        type: CoreTradeType.buy,
-      );
-
-      await executeTrade(trade);
-
-      await _checkAndExecuteTakeProfit(params);
-      return StrategyExecutionResult.success;
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to execute strategy', e, stackTrace);
-      return StrategyExecutionResult.error;
+      // Se non riesce a ottenere il prezzo né dall'API né dal database, lancia un'eccezione
+      throw Exception('Unable to get current price for $symbol');
     }
-  }
-
-  double calculateMinimumTradableAmount(double price, double minOrderValue) {
-    return (minOrderValue / price).ceil() * price;
   }
 
   Future<void> sellEntirePortfolio(String symbol, double targetProfit) async {
     try {
-      var portfolio = await _getPortfolio(symbol);
-      var currentPrice = await _apiService.getCurrentPrice(symbol);
-      if (currentPrice >= portfolio.averagePrice * (1 + targetProfit)) {
-        await executeTrade(CoreTrade(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          symbol: symbol,
-          amount: portfolio.totalAmount,
-          price: currentPrice,
-          timestamp: DateTime.now(),
-          type: CoreTradeType.sell,
-        ));
-      } else {
+      // Ottieni il saldo attuale per il simbolo specificato
+      final balance = await _apiService.getAccountBalance(symbol);
+
+      if (balance > 0) {
+        // Crea un ordine di vendita al mercato per l'intero saldo
+        final order = await _apiService.createMarketSellOrder(symbol, balance);
+
+        // Assumiamo che l'API restituisca il prezzo medio di esecuzione
+        final executionPrice = double.parse(order['avgPrice'] ?? '0');
+
+        // Registra la transazione nel database
+        await _databaseService.insert('trades', {
+          'symbol': symbol,
+          'amount': balance,
+          'price': executionPrice,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'type': 'sell',
+        });
+
+        // Aggiorna le statistiche
+        final currentStats = await _strategyRepository.getStrategyStatistics();
+        final updatedStats = {
+          ...currentStats,
+          'totalInvested': 0.0,
+          'totalProfit': currentStats['totalProfit'] + targetProfit,
+          'totalTrades': currentStats['totalTrades'] + 1,
+        };
+        await _databaseService.insert('strategy_statistics', updatedStats);
       }
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to sell entire portfolio', e, stackTrace);
-      throw Exception('Error in selling entire portfolio');
+    } catch (e) {
+      // Gestisci eventuali errori
+      throw Exception('Failed to sell entire portfolio: $e');
     }
   }
 
-  Future<DateTime?> _getLastPurchaseDate(String symbol) async {
-    final lastTrade = await _databaseService.getLastTrade(symbol);
-    return lastTrade?.timestamp;
+  Future<void> executeStrategy(StrategyParameters params) async {
+    try {
+      double currentPrice = await _apiService.getCurrentPrice(params.symbol);
+      double minimumTradableAmount = params.useAutoMinTradeAmount
+          ? await _apiService.getMinimumTradeAmount(params.symbol)
+          : params.manualMinTradeAmount;
+
+      double amountToBuy =
+          _calculateBuyAmount(params, minimumTradableAmount, currentPrice);
+
+      if (await _shouldBuy(params, currentPrice)) {
+        await _executeBuy(params.symbol, amountToBuy, currentPrice,
+            params.isVariableInvestmentAmount);
+      } else if (await _shouldSell(params, currentPrice)) {
+        await _executeSell(params, currentPrice);
+      }
+
+      await _checkAndExecuteTakeProfit(params);
+    } catch (e) {
+      throw Exception('Failed to execute strategy: $e');
+    }
+  }
+
+  double _calculateBuyAmount(StrategyParameters params,
+      double minimumTradableAmount, double currentPrice) {
+    double baseAmount = params.investmentAmount;
+    if (params.isVariableInvestmentAmount) {
+      double variationPercentage = (params.variableInvestmentPercentage / 100);
+      double randomFactor =
+          1 + (Random().nextDouble() * 2 - 1) * variationPercentage;
+      baseAmount *= randomFactor;
+    }
+    return (baseAmount / currentPrice)
+        .clamp(minimumTradableAmount, params.maxInvestmentSize);
+  }
+
+  Future<bool> _shouldBuy(
+      StrategyParameters params, double currentPrice) async {
+    Portfolio portfolio = await _getPortfolio(params.symbol);
+    return currentPrice <=
+        portfolio.averagePrice * (1 - params.stopLossPercentage / 100);
+  }
+
+  Future<bool> _shouldSell(
+      StrategyParameters params, double currentPrice) async {
+    Portfolio portfolio = await _getPortfolio(params.symbol);
+    return currentPrice >=
+        portfolio.averagePrice * (1 + params.targetProfitPercentage / 100);
+  }
+
+  Future<void> _executeBuy(String symbol, double amount, double price,
+      bool isVariableInvestment) async {
+    CoreTrade trade = CoreTrade(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      symbol: symbol,
+      amount: amount,
+      price: price,
+      timestamp: DateTime.now(),
+      type: CoreTradeType.buy,
+    );
+
+    await _strategyRepository.saveTradeWithNewFields(
+        trade, isVariableInvestment, null);
+  }
+
+  Future<void> _executeSell(
+      StrategyParameters params, double currentPrice) async {
+    Portfolio portfolio = await _getPortfolio(params.symbol);
+    CoreTrade trade = CoreTrade(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      symbol: params.symbol,
+      amount: portfolio.totalAmount,
+      price: currentPrice,
+      timestamp: DateTime.now(),
+      type: CoreTradeType.sell,
+    );
+
+    double profit =
+        (currentPrice - portfolio.averagePrice) * portfolio.totalAmount;
+    await _strategyRepository.saveTradeWithNewFields(trade, false, null);
+
+    if (params.reinvestProfits) {
+      await _reinvestProfit(params.symbol, profit, currentPrice);
+    }
+  }
+
+  Future<void> _reinvestProfit(
+      String symbol, double profit, double currentPrice) async {
+    double amountToBuy = profit / currentPrice;
+    CoreTrade reinvestmentTrade = CoreTrade(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      symbol: symbol,
+      amount: amountToBuy,
+      price: currentPrice,
+      timestamp: DateTime.now(),
+      type: CoreTradeType.buy,
+    );
+
+    await _strategyRepository.saveTradeWithNewFields(
+        reinvestmentTrade, false, profit);
   }
 
   Future<void> _checkAndExecuteTakeProfit(StrategyParameters params) async {
-    List<Map<String, dynamic>> tradeData =
-        await _databaseService.query('trades');
-    List<CoreTrade> trades =
-        tradeData.map((data) => CoreTrade.fromJson(data)).toList();
+    double currentPrice = await _apiService.getCurrentPrice(params.symbol);
+    Portfolio portfolio = await _getPortfolio(params.symbol);
 
-    if (trades.isEmpty) return;
-
-    double totalAmount = 0;
-    double totalValue = 0;
-    for (var trade in trades) {
-      if (trade.type == CoreTradeType.buy) {
-        totalAmount += trade.amount;
-        totalValue += trade.amount * trade.price;
-      }
-    }
-    double averagePrice = totalValue / totalAmount;
-
-    double currentPrice = await _getCurrentPrice(params.symbol);
-
-    if (currentPrice >= averagePrice * (1 + params.targetProfitPercentage)) {
-      await sellEntirePortfolio(params.symbol, params.targetProfitPercentage);
-    }
-  }
-
-  Future<double> _getCurrentPrice(String symbol) async {
-    return await _apiService.getCurrentPrice(symbol);
-  }
-
-  Future<double> _getCurrentPortfolioValue() async {
-    try {
-      final accountInfo = await _apiService.getAccountInfo();
-      final balances = accountInfo['balances'] as List;
-      double totalValue = 0;
-
-      for (var balance in balances) {
-        double free = double.parse(balance['free']);
-        if (free > 0) {
-          if (balance['asset'] != 'USDT') {
-            double price =
-                await _apiService.getCurrentPrice('${balance['asset']}USDT');
-            totalValue += free * price;
-          } else {
-            totalValue += free;
-          }
-        }
-      }
-
-      return totalValue;
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-          'Failed to get current portfolio value', e, stackTrace);
-      throw Exception('Error in portfolio value calculation');
-    }
-  }
-
-  Future<List<CoreTrade>> getTradeHistory(String symbol) async {
-    try {
-      final orders = await _apiService.getAllOrders(symbol: symbol);
-      return orders
-          .map<CoreTrade>((order) => CoreTrade(
-                id: order['orderId'].toString(),
-                symbol: order['symbol'],
-                amount: double.parse(order['executedQty']),
-                price: double.parse(order['price']),
-                timestamp: DateTime.fromMillisecondsSinceEpoch(order['time']),
-                type: order['side'] == 'BUY'
-                    ? CoreTradeType.buy
-                    : CoreTradeType.sell,
-              ))
-          .toList();
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to get trade history', e, stackTrace);
-      // Fallback to local data
-      final localData = await _databaseService.query('trades');
-      return localData.map((trade) => CoreTrade.fromJson(trade)).toList();
-    }
-  }
-
-  Future<void> stopStrategy() async {
-    try {
-      // Logica per fermare la strategia
-      // Ad esempio, cancellare tutti gli ordini aperti
-      // e aggiornare lo stato della strategia nel database
-      await _databaseService.update('strategy_status', {'status': 'inactive'});
-    } catch (e) {
-      throw Exception('Failed to stop strategy: $e');
-    }
-  }
-
-  Future<void> cancelOrder(String symbol, String orderId) async {
-    try {
-      await _apiService.cancelOrder(symbol: symbol, orderId: orderId);
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to cancel order', e, stackTrace);
-      throw Exception('Error cancelling order');
-    }
-  }
-
-  Future<List<CoreTrade>> getOpenOrders(String symbol) async {
-    try {
-      final openOrders = await _apiService.getOpenOrders(symbol: symbol);
-      return openOrders
-          .map<CoreTrade>((order) => CoreTrade(
-                id: order['orderId'].toString(),
-                symbol: order['symbol'],
-                amount: double.parse(order['origQty']),
-                price: double.parse(order['price']),
-                timestamp: DateTime.fromMillisecondsSinceEpoch(order['time']),
-                type: order['side'] == 'BUY'
-                    ? CoreTradeType.buy
-                    : CoreTradeType.sell,
-              ))
-          .toList();
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to get open orders', e, stackTrace);
-      throw Exception('Error getting open orders');
-    }
-  }
-
-  Future<void> updateStrategyParameters(StrategyParameters params) async {
-    try {
-      await _databaseService.insert('strategy_parameters', params.toJson());
-    } catch (e, stackTrace) {
-      ErrorHandler.logError(
-          'Failed to update strategy parameters', e, stackTrace);
-      throw Exception('Error updating strategy parameters');
-    }
-  }
-
-  Future<StrategyParameters> getStrategyParameters() async {
-    try {
-      final data = await _databaseService.query('strategy_parameters');
-      if (data.isNotEmpty) {
-        return StrategyParameters.fromJson(data.first);
-      } else {
-        // Return default parameters if none are saved
-        return StrategyParameters(
-          symbol: 'BTCUSDT',
-          investmentAmount: 100.0,
-          intervalDays: 7,
-          targetProfitPercentage: 5.0,
-          stopLossPercentage: 3.0,
-          purchaseFrequency: 1,
-          maxInvestmentSize: 1000.0,
-        );
-      }
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to get strategy parameters', e, stackTrace);
-      throw Exception('Error getting strategy parameters');
+    if (currentPrice >=
+        portfolio.averagePrice * (1 + params.targetProfitPercentage / 100)) {
+      await _executeSell(params, currentPrice);
     }
   }
 
   Future<Portfolio> _getPortfolio(String symbol) async {
-    try {
-      final trades = await getTradeHistory(symbol);
-      double totalAmount = 0;
-      double totalValue = 0;
-      for (var trade in trades) {
-        if (trade.type == CoreTradeType.buy) {
-          totalAmount += trade.amount;
-          totalValue += trade.amount * trade.price;
-        } else {
-          totalAmount -= trade.amount;
-          totalValue -= trade.amount * trade.price;
-        }
+    List<CoreTrade> trades = await _strategyRepository.getRecentTrades(1000);
+    trades = trades.where((trade) => trade.symbol == symbol).toList();
+
+    double totalAmount = 0;
+    double totalValue = 0;
+
+    for (var trade in trades) {
+      if (trade.type == CoreTradeType.buy) {
+        totalAmount += trade.amount;
+        totalValue += trade.amount * trade.price;
+      } else {
+        totalAmount -= trade.amount;
+        totalValue -= trade.amount * trade.price;
       }
-      double averagePrice = totalValue / totalAmount;
-      return Portfolio(
-        symbol: symbol,
-        totalAmount: totalAmount,
-        averagePrice: averagePrice,
-      );
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Failed to get portfolio', e, stackTrace);
-      throw Exception('Error getting portfolio');
     }
+
+    double averagePrice = totalAmount > 0 ? totalValue / totalAmount : 0;
+
+    return Portfolio(
+      symbol: symbol,
+      totalAmount: totalAmount,
+      averagePrice: averagePrice,
+    );
   }
 }
 
