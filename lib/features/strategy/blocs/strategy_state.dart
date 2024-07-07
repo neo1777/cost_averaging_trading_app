@@ -31,7 +31,6 @@ class StrategyLoaded extends StrategyState {
   final List<CoreTrade> recentTrades;
   final bool isDemo;
 
-
   const StrategyLoaded({
     required this.parameters,
     required this.status,
@@ -44,8 +43,7 @@ class StrategyLoaded extends StrategyState {
     this.averageBuyPrice = 0,
     this.currentMarketPrice = 0,
     this.recentTrades = const [],
-        this.isDemo = false,
-
+    this.isDemo = false,
   });
 
   StrategyLoaded copyWith({
@@ -60,14 +58,14 @@ class StrategyLoaded extends StrategyState {
     double? averageBuyPrice,
     double? currentMarketPrice,
     List<CoreTrade>? recentTrades,
-        bool? isDemo,
-
+    bool? isDemo,
   }) {
     return StrategyLoaded(
       parameters: parameters ?? this.parameters,
       status: status ?? this.status,
       chartData: chartData ?? this.chartData,
-      riskManagementSettings: riskManagementSettings ?? this.riskManagementSettings,
+      riskManagementSettings:
+          riskManagementSettings ?? this.riskManagementSettings,
       backtestResult: backtestResult ?? this.backtestResult,
       totalInvested: totalInvested ?? this.totalInvested,
       currentProfit: currentProfit ?? this.currentProfit,
@@ -75,8 +73,7 @@ class StrategyLoaded extends StrategyState {
       averageBuyPrice: averageBuyPrice ?? this.averageBuyPrice,
       currentMarketPrice: currentMarketPrice ?? this.currentMarketPrice,
       recentTrades: recentTrades ?? this.recentTrades,
-            isDemo: isDemo ?? this.isDemo,
-
+      isDemo: isDemo ?? this.isDemo,
     );
   }
 
@@ -107,7 +104,7 @@ class StrategyError extends StrategyState {
 
 class StrategyUnsafe extends StrategyLoaded {
   final String message;
-  
+
   final bool isNowDemo;
 
   const StrategyUnsafe({
@@ -121,4 +118,24 @@ class StrategyUnsafe extends StrategyLoaded {
 
   @override
   List<Object> get props => [super.props, message, isNowDemo];
+}
+
+class BacktestInProgress extends StrategyState {}
+
+class BacktestCompleted extends StrategyState {
+  final BacktestResult result;
+
+  const BacktestCompleted(this.result);
+
+  @override
+  List<Object?> get props => [result];
+}
+
+class BacktestError extends StrategyState {
+  final String error;
+
+  const BacktestError(this.error);
+
+  @override
+  List<Object?> get props => [error];
 }

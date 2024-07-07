@@ -21,7 +21,7 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
     on<LoadStrategyData>(_onLoadStrategyData);
     on<UpdateStrategyParameters>(_onUpdateStrategyParameters);
     on<StartStrategyEvent>(_onStartStrategy);
-    on<StopStrategyEvent>(_onStopStrategy);
+    on<StopStrategy>(_onStopStrategy);
     on<RunBacktestEvent>(_onRunBacktest);
     on<StartDemoStrategy>(_onStartDemoStrategy);
     on<StartLiveStrategy>(_onStartLiveStrategy);
@@ -36,7 +36,6 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
     on<StartMonitoring>(_onStartMonitoring);
     on<StopMonitoring>(_onStopMonitoring);
     on<UpdateMonitoringData>(_onUpdateMonitoringData);
-
     // Carica i dati iniziali automaticamente
     add(LoadStrategyData());
   }
@@ -120,7 +119,7 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
   }
 
   Future<void> _onStopStrategy(
-    StopStrategyEvent event,
+    StopStrategy event,
     Emitter<StrategyState> emit,
   ) async {
     if (state is StrategyLoaded) {
@@ -136,26 +135,27 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
   }
 
   Future<void> _onRunBacktest(
-    RunBacktestEvent event,
-    Emitter<StrategyState> emit,
-  ) async {
+      RunBacktestEvent event, Emitter<StrategyState> emit) async {
     if (state is StrategyLoaded) {
       final currentState = state as StrategyLoaded;
+      emit(BacktestInProgress());
+
       try {
-        emit(currentState.copyWith(status: StrategyStateStatus.backtesting));
         final backtestResult = await _backtestingService.runBacktest(
           currentState.parameters.symbol,
           event.startDate,
           event.endDate,
           currentState.parameters,
+          (progress, currentInvestmentOverTime) {
+            emit(BacktestProgressUpdate(progress, currentInvestmentOverTime));
+          },
         );
-        emit(currentState.copyWith(
-          status: StrategyStateStatus.inactive,
-          backtestResult: backtestResult,
-        ));
+        emit(BacktestCompleted(backtestResult));
       } catch (e) {
-        emit(StrategyError('Failed to run backtest: ${e.toString()}'));
+        emit(BacktestError('Failed to run backtest: $e'));
       }
+    } else {
+      emit(BacktestError('Strategy not loaded'));
     }
   }
 
@@ -365,4 +365,14 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
       ));
     }
   }
+}
+
+class BacktestProgressUpdate extends StrategyState {
+  final double progress;
+  final List<Map<String, dynamic>> currentInvestmentOverTime;
+
+  BacktestProgressUpdate(this.progress, this.currentInvestmentOverTime);
+
+  @override
+  List<Object?> get props => [progress, currentInvestmentOverTime];
 }

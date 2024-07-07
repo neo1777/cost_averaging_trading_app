@@ -143,6 +143,6 @@ File: `lib/core/services/risk_management_service.dart`
 
 ## 12. Aggiornamento dello StrategyRepository
 File: `lib/features/strategy/repositories/strategy_repository.dart`
-- [ ] Aggiorna i metodi per salvare e recuperare i parametri della strategia
-- [ ] Implementa nuovi metodi per gestire le statistiche della strategia con i nuovi parametri
-- [ ] Aggiorna la logica di persistenza dei dati della strategia per includere i nuovi campi
+- [x] Aggiorna i metodi per salvare e recuperare i parametri della strategia
+- [x] Implementa nuovi metodi per gestire le statistiche della strategia con i nuovi parametri
+- [x] Aggiorna la logica di persistenza dei dati della strategia per includere i nuovi campi
