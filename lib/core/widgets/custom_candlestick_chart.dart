@@ -71,10 +71,7 @@ class CustomCandlestickChartState extends State<CustomCandlestickChart> {
       children: [
         Candlesticks(
           candles: state.candles,
-          // onReachEnd: () {
-          //   // Implement logic to load more candles if needed
-          //   _chartBloc.add(LoadMoreCandles());
-          // },
+          // Rimuovi onIntervalChange da qui
           actions: [
             ToolBarAction(
               onPressed: () => _chartBloc.add(ToggleOrderMarkers()),
@@ -83,6 +80,10 @@ class CustomCandlestickChartState extends State<CustomCandlestickChart> {
                     ? Icons.visibility
                     : Icons.visibility_off,
               ),
+            ),
+            ToolBarAction(
+              onPressed: () => _showIntervalPicker(context),
+              child: const Text('Interval'),
             ),
           ],
         ),
@@ -109,6 +110,29 @@ class CustomCandlestickChartState extends State<CustomCandlestickChart> {
             child: Text(interval),
           );
         }).toList();
+      },
+    );
+  }
+
+  void _showIntervalPicker(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select Interval'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ChartBloc.intervals
+                .map((interval) => ListTile(
+                      title: Text(interval),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _chartBloc.add(ChangeInterval(interval));
+                      },
+                    ))
+                .toList(),
+          ),
+        );
       },
     );
   }

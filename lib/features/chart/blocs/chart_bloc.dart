@@ -1,17 +1,14 @@
 import 'dart:async';
-import 'dart:math';
-
 import 'package:candlesticks/candlesticks.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_state.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ChartBloc extends Bloc<ChartEvent, ChartState> {
   final ApiService _apiService;
   final String symbol;
   StreamSubscription<Map<String, dynamic>>? _klineSubscription;
-  StreamSubscription<Map<String, dynamic>>? _tickerSubscription;
   static const List<String> intervals = [
     '1m',
     '3m',
@@ -37,7 +34,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     on<UpdateChartData>(_onUpdateChartData);
     on<ChangeInterval>(_onChangeInterval);
     on<ToggleOrderMarkers>(_onToggleOrderMarkers);
-    on<UpdateTicker>(_onUpdateTicker); // Add this line
   }
 
   Future<void> _onLoadChartData(
@@ -45,7 +41,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     try {
       emit(ChartLoading());
       final candles = await _fetchInitialCandles();
-      _subscribeToKlineUpdates('1m'); // Make sure this line is present
+      _subscribeToKlineUpdates('1m');
       emit(ChartLoaded(
           candles: candles, interval: '1m', showOrderMarkers: true));
     } catch (e) {
@@ -59,12 +55,16 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       List<Candle> updatedCandles = List.from(currentState.candles);
 
       if (updatedCandles.isNotEmpty &&
-          updatedCandles.last.date == event.latestCandle.date) {
-        updatedCandles[updatedCandles.length - 1] = event.latestCandle;
-      } else {
-        updatedCandles.add(event.latestCandle);
+          updatedCandles[0].date == event.latestCandle.date &&
+          updatedCandles[0].open == event.latestCandle.open) {
+        // Update last candle
+        updatedCandles[0] = event.latestCandle;
+      } else if (event.latestCandle.date.difference(updatedCandles[0].date) ==
+          updatedCandles[0].date.difference(updatedCandles[1].date)) {
+        // Add new candle
+        updatedCandles.insert(0, event.latestCandle);
         if (updatedCandles.length > 100) {
-          updatedCandles.removeAt(0);
+          updatedCandles.removeLast();
         }
       }
 
@@ -110,14 +110,17 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       interval: interval,
       limit: 100,
     );
-    return klines.map((kline) => _klineToCandle(kline)).toList();
+    return klines
+        .map((kline) => Candle.fromJson(kline))
+        .toList()
+        .reversed
+        .toList();
   }
 
   void _subscribeToKlineUpdates(String interval) {
     _klineSubscription?.cancel();
     _klineSubscription =
         _apiService.getKlineStream(symbol, interval).listen((event) {
-      if (isClosed) return; // Aggiungi questo controllo
       if (event['e'] == 'kline') {
         final kline = event['k'];
         final candle = Candle(
@@ -131,57 +134,11 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         add(UpdateChartData(latestCandle: candle));
       }
     });
-
-    // Sottoscrizione separata per gli aggiornamenti del ticker in tempo reale
-    _tickerSubscription?.cancel();
-    _tickerSubscription = _apiService.getTickerStream(symbol).listen((event) {
-      if (isClosed) return; // Aggiungi questo controllo
-      if (event.containsKey('c')) {
-        add(UpdateTicker(event));
-      }
-    });
-  }
-
-  Candle _klineToCandle(List<dynamic> kline) {
-    return Candle(
-      date: DateTime.fromMillisecondsSinceEpoch(kline[0]),
-      high: double.parse(kline[2]),
-      low: double.parse(kline[3]),
-      open: double.parse(kline[1]),
-      close: double.parse(kline[4]),
-      volume: double.parse(kline[5]),
-    );
   }
 
   @override
   Future<void> close() {
     _klineSubscription?.cancel();
-    _tickerSubscription?.cancel();
     return super.close();
-  }
-
-  void _onUpdateTicker(UpdateTicker event, Emitter<ChartState> emit) {
-    if (state is ChartLoaded) {
-      final currentState = state as ChartLoaded;
-      final lastCandle = currentState.candles.last;
-      final closePrice = event.tickerData['c'];
-      if (closePrice != null) {
-        final updatedCandle = Candle(
-          date: lastCandle.date,
-          high: max(lastCandle.high, double.parse(closePrice)),
-          low: min(lastCandle.low, double.parse(closePrice)),
-          open: lastCandle.open,
-          close: double.parse(closePrice),
-          volume: lastCandle.volume,
-        );
-        final updatedCandles = List<Candle>.from(currentState.candles);
-        updatedCandles[updatedCandles.length - 1] = updatedCandle;
-        emit(ChartLoaded(
-          candles: updatedCandles,
-          interval: currentState.interval,
-          showOrderMarkers: currentState.showOrderMarkers,
-        ));
-      }
-    }
   }
 }
