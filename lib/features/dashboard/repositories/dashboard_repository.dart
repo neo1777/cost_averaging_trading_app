@@ -79,8 +79,8 @@ class DashboardRepository {
       );
       return klines
           .map((kline) => {
-                'date': DateTime.fromMillisecondsSinceEpoch(kline['0']),
-                'value': double.parse(kline['4']), // Closing price
+                'date': DateTime.fromMillisecondsSinceEpoch(kline[0]),
+                'value': double.parse(kline[4]), // Closing price
               })
           .toList();
     } catch (e) {

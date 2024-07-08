@@ -19,7 +19,8 @@ class StrategyRepository {
     }
   }
 
-  Future<void> sellEntirePortfolio(String symbol, double targetProfit, TradingService tradingService) async {
+  Future<void> sellEntirePortfolio(
+      String symbol, double targetProfit, TradingService tradingService) async {
     await tradingService.sellEntirePortfolio(symbol, targetProfit);
   }
 
@@ -115,18 +116,31 @@ class StrategyRepository {
     }
   }
 
+  Future<StrategyParameters?> getActiveStrategy() async {
+    try {
+      final status = await getStrategyStatus();
+      if (status == StrategyStateStatus.active) {
+        return await getStrategyParameters();
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<StrategyStateStatus> getStrategyStatus() async {
     try {
       final result = await databaseService.query('strategy_status');
       if (result.isNotEmpty) {
+        final statusString = result.first['status'] as String;
         return StrategyStateStatus.values.firstWhere(
-          (e) => e.toString().split('.').last == result.first['status'],
+          (e) => e.toString().split('.').last == statusString,
           orElse: () => StrategyStateStatus.inactive,
         );
       }
       return StrategyStateStatus.inactive;
     } catch (e) {
-      throw Exception('Failed to get strategy status: $e');
+      return StrategyStateStatus.inactive;
     }
   }
 

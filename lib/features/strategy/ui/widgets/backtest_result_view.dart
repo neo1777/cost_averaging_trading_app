@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 class BacktestResultView extends StatelessWidget {
   final BacktestResult result;
 
-  const BacktestResultView({Key? key, required this.result}) : super(key: key);
+  const BacktestResultView({super.key, required this.result});
 
   @override
   Widget build(BuildContext context) {
@@ -29,12 +29,12 @@ class BacktestResultView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Backtest Results',
-                style: Theme.of(context).textTheme.headline5),
-            SizedBox(height: 16),
+                style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 16),
             BacktestProgressChart(spots: spots, minY: minY, maxY: maxY),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text('Performance Metrics:',
-                style: Theme.of(context).textTheme.headline6),
+                style: Theme.of(context).textTheme.titleLarge),
             Text(
                 'Total Profit: \$${result.performance.totalProfit.toStringAsFixed(2)}'),
             Text(
@@ -45,9 +45,9 @@ class BacktestResultView extends StatelessWidget {
                 'Win Rate: ${(result.performance.winRate * 100).toStringAsFixed(2)}%'),
             Text(
                 'Sharpe Ratio: ${result.performance.sharpeRatio.toStringAsFixed(2)}'),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton(
-              child: Text('Back to Strategy'),
+              child: const Text('Back to Strategy'),
               onPressed: () =>
                   context.read<StrategyBloc>().add(LoadStrategyData()),
             ),

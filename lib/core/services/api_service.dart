@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class ApiService {
   final String apiKey;
@@ -24,6 +25,13 @@ class ApiService {
     }
   }
 
+  Stream<Map<String, dynamic>> getTickerStream(String symbol) {
+    final wsUrl =
+        'wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@ticker';
+    final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+    return channel.stream.map((event) => jsonDecode(event));
+  }
+
   Future<double> getAccountBalance(String asset) async {
     try {
       final accountInfo = await getAccountInfo();
@@ -38,7 +46,8 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> createMarketSellOrder(String symbol, double quantity) async {
+  Future<Map<String, dynamic>> createMarketSellOrder(
+      String symbol, double quantity) async {
     try {
       final response = await createOrder(
         symbol: symbol,
@@ -174,7 +183,7 @@ class ApiService {
     return await get('/api/v3/exchangeInfo', requiresAuth: false);
   }
 
-  Future<List<dynamic>> getKlines({
+  Future<List<List<dynamic>>> getKlines({
     required String symbol,
     required String interval,
     int? limit,
@@ -188,14 +197,31 @@ class ApiService {
       if (startTime != null) 'startTime': startTime.toString(),
       if (endTime != null) 'endTime': endTime.toString(),
     };
-    final response = await get('/api/v3/klines',
-        queryParams: queryParams, requiresAuth: false);
-    return response;
+
+    final uri = Uri.parse('$baseUrl/api/v3/klines')
+        .replace(queryParameters: queryParams);
+    final response = await http.get(uri);
+
+    if (response.statusCode == 200) {
+      return List<List<dynamic>>.from(json.decode(response.body));
+    } else {
+      throw Exception('Failed to load klines');
+    }
   }
 
   Future<Map<String, dynamic>> get24hrTickerPriceChange(String symbol) async {
     return await get('/api/v3/ticker/24hr',
         queryParams: {'symbol': symbol}, requiresAuth: false);
+  }
+
+  Stream<Map<String, dynamic>> getKlineStream(String symbol, String interval) {
+    final wsUrl =
+        'wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_$interval';
+    final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+    return channel.stream.map((event) {
+      return jsonDecode(event);
+    });
   }
 
   Future<double> getCurrentPrice(String symbol) async {
@@ -309,8 +335,6 @@ class ApiService {
       quantity: quantity.toStringAsFixed(8),
     );
   }
-
-
 
   Future<String> createLimitBuyOrder(
       String symbol, double quantity, double price) async {

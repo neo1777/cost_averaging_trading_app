@@ -7,11 +7,11 @@ class BacktestProgressChart extends StatelessWidget {
   final double maxY;
 
   const BacktestProgressChart({
-    Key? key,
+    super.key,
     required this.spots,
     required this.minY,
     required this.maxY,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,8 +19,8 @@ class BacktestProgressChart extends StatelessWidget {
       aspectRatio: 1.70,
       child: LineChart(
         LineChartData(
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(show: false),
+          gridData: const FlGridData(show: false),
+          titlesData: const FlTitlesData(show: false),
           borderData: FlBorderData(show: true),
           minX: 0,
           maxX: spots.length.toDouble() - 1,
@@ -33,7 +33,7 @@ class BacktestProgressChart extends StatelessWidget {
               color: Theme.of(context).primaryColor,
               barWidth: 3,
               isStrokeCapRound: true,
-              dotData: FlDotData(show: false),
+              dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(show: false),
             ),
           ],

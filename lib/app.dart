@@ -86,8 +86,10 @@ class App extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           BlocProvider<DashboardBloc>(
-            create: (context) =>
-                DashboardBloc(context.read<DashboardRepository>()),
+            create: (context) => DashboardBloc(
+              context.read<DashboardRepository>(),
+              context.read<StrategyRepository>(),
+            ),
           ),
           BlocProvider<PortfolioBloc>(
             create: (context) =>

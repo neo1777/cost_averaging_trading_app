@@ -11,7 +11,7 @@ import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy
 import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_control_panel.dart';
 
 class StrategyPage extends StatelessWidget {
-  const StrategyPage({Key? key}) : super(key: key);
+  const StrategyPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +61,7 @@ class StrategyPage extends StatelessWidget {
             ),
           );
         } else if (state is BacktestInProgress) {
-          return Center(
+          return const Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -81,10 +81,10 @@ class StrategyPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircularProgressIndicator(value: state.progress),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
                     'Running Backtest: ${(state.progress * 100).toStringAsFixed(1)}%'),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 BacktestProgressChart(
                   spots: state.currentInvestmentOverTime
                       .asMap()
@@ -113,27 +113,27 @@ class StrategyPage extends StatelessWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Run Backtest'),
+          title: const Text('Run Backtest'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Select backtest period:'),
+              const Text('Select backtest period:'),
               ElevatedButton(
-                child: Text('Last 30 days'),
+                child: const Text('Last 30 days'),
                 onPressed: () {
                   Navigator.of(context).pop();
                   context.read<StrategyBloc>().add(RunBacktestEvent(
-                        DateTime.now().subtract(Duration(days: 30)),
+                        DateTime.now().subtract(const Duration(days: 30)),
                         DateTime.now(),
                       ));
                 },
               ),
               ElevatedButton(
-                child: Text('Last 90 days'),
+                child: const Text('Last 90 days'),
                 onPressed: () {
                   Navigator.of(context).pop();
                   context.read<StrategyBloc>().add(RunBacktestEvent(
-                        DateTime.now().subtract(Duration(days: 90)),
+                        DateTime.now().subtract(const Duration(days: 90)),
                         DateTime.now(),
                       ));
                 },

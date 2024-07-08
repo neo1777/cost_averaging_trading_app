@@ -27,6 +27,8 @@ dependencies:
   device_preview: ^1.1.0
   intl: ^0.18.1
   responsive_builder: ^0.7.0
+  candlesticks: ^2.1.0
+  web_socket_channel: ^2.4.5
 
 dev_dependencies:
   flutter_test:

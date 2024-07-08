@@ -155,7 +155,7 @@ class StrategyBloc extends Bloc<StrategyEvent, StrategyState> {
         emit(BacktestError('Failed to run backtest: $e'));
       }
     } else {
-      emit(BacktestError('Strategy not loaded'));
+      emit(const BacktestError('Strategy not loaded'));
     }
   }
 
@@ -371,7 +371,7 @@ class BacktestProgressUpdate extends StrategyState {
   final double progress;
   final List<Map<String, dynamic>> currentInvestmentOverTime;
 
-  BacktestProgressUpdate(this.progress, this.currentInvestmentOverTime);
+  const BacktestProgressUpdate(this.progress, this.currentInvestmentOverTime);
 
   @override
   List<Object?> get props => [progress, currentInvestmentOverTime];

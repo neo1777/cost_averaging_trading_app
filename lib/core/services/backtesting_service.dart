@@ -189,7 +189,6 @@ class BacktestingService {
         investmentOverTime: investmentOverTime,
       );
     } catch (e) {
-      print('Error during backtesting: $e');
       rethrow;
     }
   }
@@ -198,7 +197,6 @@ class BacktestingService {
     try {
       return await apiService.getMinimumTradeAmount(symbol);
     } catch (e) {
-      print('Error getting minimum trade amount: $e');
       return 0.00001; // Valore di fallback
     }
   }

@@ -1,12 +1,16 @@
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_bloc.dart';
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_state.dart';
-import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/portfolio_overview.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/performance_chart.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/recent_trades_widget.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_candlestick_chart.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/ui/widgets/responsive_text.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -14,14 +18,7 @@ class DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<DashboardBloc, DashboardState>(
-      listener: (context, state) {
-        if (state is DashboardError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
-        }
-      },
+    return BlocBuilder<DashboardBloc, DashboardState>(
       builder: (context, state) {
         if (state is DashboardInitial) {
           context.read<DashboardBloc>().add(LoadDashboardData());
@@ -79,10 +76,14 @@ class DashboardPage extends StatelessWidget {
                           currentPage: state.currentPage,
                           tradesPerPage: state.tradesPerPage,
                           onPageChanged: (newPage) {
-                            context.read<DashboardBloc>().add(ChangePage(newPage));
+                            context
+                                .read<DashboardBloc>()
+                                .add(ChangePage(newPage));
                           },
                           onChangeTradesPerPage: (newValue) {
-                            context.read<DashboardBloc>().add(ChangeTradesPerPage(newValue));
+                            context
+                                .read<DashboardBloc>()
+                                .add(ChangeTradesPerPage(newValue));
                           },
                         ),
                       ),
@@ -92,10 +93,29 @@ class DashboardPage extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   flex: 3,
-                  child: CustomCard(
-                    child: PerformanceChart(
-                      performanceData: state.performanceData,
-                    ),
+                  child: Column(
+                    children: [
+                      CustomCard(
+                        child: SizedBox(
+                          height: 400,
+                          child: BlocProvider(
+                            create: (context) => ChartBloc(
+                              symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
+                              apiService: context.read<ApiService>(),
+                            )..add(LoadChartData()),
+                            child: CustomCandlestickChart(
+                              symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
+                              trades: state.recentTrades,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      CustomCard(
+                        child: PerformanceChart(
+                            performanceData: state.performanceData),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -119,13 +139,27 @@ class DashboardPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             CustomCard(
+              child: SizedBox(
+                height: 400,
+                child: BlocProvider(
+                  create: (context) => ChartBloc(
+                    symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
+                    apiService: context.read<ApiService>(),
+                  )..add(LoadChartData()),
+                  child: CustomCandlestickChart(
+                    symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
+                    trades: state.recentTrades,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomCard(
               child: PortfolioOverview(portfolio: state.portfolio),
             ),
             const SizedBox(height: 16),
             CustomCard(
-              child: PerformanceChart(
-                performanceData: state.performanceData,
-              ),
+              child: PerformanceChart(performanceData: state.performanceData),
             ),
             const SizedBox(height: 16),
             CustomCard(
@@ -137,7 +171,9 @@ class DashboardPage extends StatelessWidget {
                   context.read<DashboardBloc>().add(ChangePage(newPage));
                 },
                 onChangeTradesPerPage: (newValue) {
-                  context.read<DashboardBloc>().add(ChangeTradesPerPage(newValue));
+                  context
+                      .read<DashboardBloc>()
+                      .add(ChangeTradesPerPage(newValue));
                 },
               ),
             ),

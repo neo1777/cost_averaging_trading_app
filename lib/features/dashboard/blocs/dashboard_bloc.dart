@@ -1,13 +1,15 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
+
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_state.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/repositories/dashboard_repository.dart';
+import 'package:cost_averaging_trading_app/features/strategy/repositories/strategy_repository.dart';
 
 class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
   final DashboardRepository _repository;
+  final StrategyRepository _strategyRepository;
 
-  DashboardBloc(this._repository) : super(DashboardInitial()) {
+  DashboardBloc(this._repository, this._strategyRepository) : super(DashboardInitial()) {
     on<LoadDashboardData>(_onLoadDashboardData);
     on<ChangePage>(_onChangePage);
     on<ChangeTradesPerPage>(_onChangeTradesPerPage);
@@ -22,21 +24,18 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final portfolio = await _repository.getPortfolio();
       final recentTrades = await _repository.getRecentTrades();
       final performanceData = await _repository.getPerformanceData();
+      final activeStrategy = await _strategyRepository.getActiveStrategy();
 
-      if (portfolio.assets.isEmpty) {
-        emit(const DashboardError('No portfolio data available'));
-      } else {
-        emit(DashboardLoaded(
-          portfolio: portfolio,
-          recentTrades: recentTrades,
-          performanceData: performanceData,
-          currentPage: 1,
-          tradesPerPage: 10,
-        ));
-      }
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Error loading dashboard data', e, stackTrace);
-      emit(DashboardError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      emit(DashboardLoaded(
+        portfolio: portfolio,
+        recentTrades: recentTrades,
+        performanceData: performanceData,
+        currentPage: 1,
+        tradesPerPage: 10,
+        activeStrategy: activeStrategy, // Aggiungi questa riga
+      ));
+    } catch (e) {
+      emit(DashboardError(e.toString()));
     }
   }
 
