@@ -7,7 +7,6 @@ import 'package:cost_averaging_trading_app/features/settings/ui/pages/settings_p
 import 'package:cost_averaging_trading_app/features/strategy/ui/pages/strategy_page.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/ui/pages/trade_history_page.dart';
 import 'package:cost_averaging_trading_app/ui/layouts/main_layout.dart';
-// Aggiungi questa importazione
 
 class Routes {
   static const String dashboard = '/';

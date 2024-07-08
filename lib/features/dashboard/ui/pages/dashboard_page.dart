@@ -1,16 +1,13 @@
-import 'package:cost_averaging_trading_app/features/chart/blocs/chart_bloc.dart';
-import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
-import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_state.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/portfolio_overview.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/performance_chart.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/recent_trades_widget.dart';
 import 'package:cost_averaging_trading_app/core/widgets/custom_candlestick_chart.dart';
-import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/ui/widgets/responsive_text.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -98,15 +95,9 @@ class DashboardPage extends StatelessWidget {
                       CustomCard(
                         child: SizedBox(
                           height: 400,
-                          child: BlocProvider(
-                            create: (context) => ChartBloc(
-                              symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
-                              apiService: context.read<ApiService>(),
-                            )..add(LoadChartData()),
-                            child: CustomCandlestickChart(
-                              symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
-                              trades: state.recentTrades,
-                            ),
+                          child: CustomCandlestickChart(
+                            symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
+                            trades: state.recentTrades,
                           ),
                         ),
                       ),
@@ -141,15 +132,9 @@ class DashboardPage extends StatelessWidget {
             CustomCard(
               child: SizedBox(
                 height: 400,
-                child: BlocProvider(
-                  create: (context) => ChartBloc(
-                    symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
-                    apiService: context.read<ApiService>(),
-                  )..add(LoadChartData()),
-                  child: CustomCandlestickChart(
-                    symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
-                    trades: state.recentTrades,
-                  ),
+                child: CustomCandlestickChart(
+                  symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
+                  trades: state.recentTrades,
                 ),
               ),
             ),

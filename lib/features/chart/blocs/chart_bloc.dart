@@ -11,6 +11,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
   final ApiService _apiService;
   final String symbol;
   StreamSubscription<Map<String, dynamic>>? _klineSubscription;
+  StreamSubscription<Map<String, dynamic>>? _tickerSubscription;
   static const List<String> intervals = [
     '1m',
     '3m',
@@ -116,6 +117,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     _klineSubscription?.cancel();
     _klineSubscription =
         _apiService.getKlineStream(symbol, interval).listen((event) {
+      if (isClosed) return; // Aggiungi questo controllo
       if (event['e'] == 'kline') {
         final kline = event['k'];
         final candle = Candle(
@@ -131,27 +133,11 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     });
 
     // Sottoscrizione separata per gli aggiornamenti del ticker in tempo reale
-    _apiService.getTickerStream(symbol).listen((event) {
+    _tickerSubscription?.cancel();
+    _tickerSubscription = _apiService.getTickerStream(symbol).listen((event) {
+      if (isClosed) return; // Aggiungi questo controllo
       if (event.containsKey('c')) {
         add(UpdateTicker(event));
-      }
-    });
-
-    // Aggiungi una sottoscrizione separata per gli aggiornamenti in tempo reale
-    _apiService.getTickerStream(symbol).listen((event) {
-      if (state is ChartLoaded) {
-        final currentState = state as ChartLoaded;
-        final lastCandle = currentState.candles.last;
-        final updatedCandle = Candle(
-          date: lastCandle.date,
-          high: max(lastCandle.high, double.parse(event['p'])),
-          low: min(lastCandle.low, double.parse(event['p'])),
-          open: lastCandle.open,
-          close: double.parse(event['p']),
-          volume: lastCandle.volume + double.parse(event['p']),
-        );
-
-        add(UpdateChartData(latestCandle: updatedCandle));
       }
     });
   }
@@ -170,6 +156,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
   @override
   Future<void> close() {
     _klineSubscription?.cancel();
+    _tickerSubscription?.cancel();
     return super.close();
   }
 

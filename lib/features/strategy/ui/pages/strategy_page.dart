@@ -42,9 +42,8 @@ class StrategyPage extends StatelessWidget {
                         context.read<StrategyBloc>().add(StartLiveStrategy()),
                     onStartDemo: () =>
                         context.read<StrategyBloc>().add(StartDemoStrategy()),
-                    onStop: () => context
-                        .read<StrategyBloc>()
-                        .add(StopStrategy()), // Assicurati che sia StopStrategy
+                    onStop: () =>
+                        context.read<StrategyBloc>().add(StopStrategy()),
                     onBacktest: () => _showBacktestDialog(context),
                   ),
                   if (state.status == StrategyStateStatus.active)
