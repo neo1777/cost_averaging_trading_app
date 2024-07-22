@@ -1,3 +1,4 @@
+import 'package:cost_averaging_trading_app/core/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cost_averaging_trading_app/app.dart';
 import 'package:cost_averaging_trading_app/core/providers/app_providers.dart';
@@ -14,6 +15,10 @@ void main() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
+
+  // Inizializza il database
+  final databaseService = DatabaseService();
+  await databaseService.initDatabase();
 
   runApp(
     const AppProviders(

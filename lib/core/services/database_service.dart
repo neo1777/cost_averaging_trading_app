@@ -4,39 +4,42 @@ import 'package:cost_averaging_trading_app/features/strategy/models/strategy_par
 
 class DatabaseService {
   static Database? _database;
+  static const String _databaseName = 'trading_strategy.db';
+  static const int _databaseVersion = 3;
 
   Future<void> initDatabase() async {
     if (_database != null) return;
-    _database = await _initDatabase();
+    String path = join(await getDatabasesPath(), _databaseName);
+    _database = await openDatabase(
+      path,
+      version: _databaseVersion,
+      onCreate: _createDb,
+      onUpgrade: _upgradeDb,
+      onConfigure: _configureDb,
+    );
   }
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
+    if (_database == null) {
+      await initDatabase();
+    }
     return _database!;
   }
 
-  Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'trading_strategy_new2.db');
-    //deleteDatabase(path);
-    return await openDatabase(
-      path,
-      version: 2,
-      onCreate: _createDb,
-      onUpgrade: _upgradeDb,
-    );
+  Future<void> _configureDb(Database db) async {
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future<void> _createDb(Database db, int version) async {
     await db.execute('''
       CREATE TABLE trades(
         id TEXT PRIMARY KEY,
-        symbol TEXT,
-        amount REAL,
-        price REAL,
-        timestamp INTEGER,
-        type TEXT,
-        isVariableInvestment INTEGER,
+        symbol TEXT NOT NULL,
+        amount REAL NOT NULL,
+        price REAL NOT NULL,
+        timestamp INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        isVariableInvestment INTEGER NOT NULL,
         reinvestedProfit REAL
       )
     ''');
@@ -44,43 +47,70 @@ class DatabaseService {
     await db.execute('''
       CREATE TABLE strategy_parameters(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        symbol TEXT,
-        investmentAmount REAL,
-        intervalDays INTEGER,
-        targetProfitPercentage REAL,
-        stopLossPercentage REAL,
-        purchaseFrequency INTEGER,
-        maxInvestmentSize REAL,
-        useAutoMinTradeAmount INTEGER,
-        manualMinTradeAmount REAL,
-        isVariableInvestmentAmount INTEGER,
-        variableInvestmentPercentage REAL,
-        reinvestProfits INTEGER
+        symbol TEXT NOT NULL,
+        investmentAmount REAL NOT NULL,
+        intervalDays INTEGER NOT NULL,
+        targetProfitPercentage REAL NOT NULL,
+        stopLossPercentage REAL NOT NULL,
+        purchaseFrequency INTEGER NOT NULL,
+        maxInvestmentSize REAL NOT NULL,
+        useAutoMinTradeAmount INTEGER NOT NULL,
+        manualMinTradeAmount REAL NOT NULL,
+        isVariableInvestmentAmount INTEGER NOT NULL,
+        variableInvestmentPercentage REAL NOT NULL,
+        reinvestProfits INTEGER NOT NULL
       )
     ''');
 
     await db.execute('''
       CREATE TABLE strategy_status(
-       id INTEGER PRIMARY KEY AUTOINCREMENT,
-       status TEXT NOT NULL
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status TEXT NOT NULL
       )
     ''');
 
     await db.execute('''
       CREATE TABLE price_history (
-       id INTEGER PRIMARY KEY AUTOINCREMENT,
-       symbol TEXT NOT NULL,
-       price REAL NOT NULL,
-       timestamp INTEGER NOT NULL
-       )
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL,
+        price REAL NOT NULL,
+        timestamp INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE portfolio (
+        id TEXT PRIMARY KEY,
+        assets TEXT NOT NULL,
+        totalValue REAL NOT NULL,
+        lastUpdated INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_trades_symbol ON trades(symbol)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_price_history_symbol_timestamp ON price_history(symbol, timestamp)
     ''');
   }
 
   Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute(
-          'ALTER TABLE trades ADD COLUMN isVariableInvestment INTEGER');
+          'ALTER TABLE trades ADD COLUMN isVariableInvestment INTEGER NOT NULL DEFAULT 0');
       await db.execute('ALTER TABLE trades ADD COLUMN reinvestedProfit REAL');
+    }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS portfolio (
+          id TEXT PRIMARY KEY,
+          assets TEXT NOT NULL,
+          totalValue REAL NOT NULL,
+          lastUpdated INTEGER NOT NULL
+        )
+      ''');
     }
   }
 
@@ -150,5 +180,44 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getRecentTrades(int limit) async {
     Database db = await database;
     return await db.query('trades', orderBy: 'timestamp DESC', limit: limit);
+  }
+
+  Future<void> performMaintenance() async {
+    Database db = await database;
+    await db.execute('VACUUM');
+    await db.execute('ANALYZE');
+  }
+
+  Future<bool> isDatabaseHealthy() async {
+    try {
+      Database db = await database;
+      await db.rawQuery('SELECT 1');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> backupDatabase() async {
+    Database db = await database;
+    String path = db.path;
+    String backupPath = '$path.backup';
+    await db.rawQuery('VACUUM INTO ?', [backupPath]);
+  }
+
+  Future<void> checkAndCleanupOldData() async {
+    Database db = await database;
+    final thirtyDaysAgo =
+        DateTime.now().subtract(Duration(days: 30)).millisecondsSinceEpoch;
+
+    await db.delete('price_history',
+        where: 'timestamp < ?', whereArgs: [thirtyDaysAgo]);
+    await db
+        .delete('trades', where: 'timestamp < ?', whereArgs: [thirtyDaysAgo]);
+  }
+
+  Future<void> optimizeDatabasePerformance() async {
+    Database db = await database;
+    await db.execute('PRAGMA optimize');
   }
 }
