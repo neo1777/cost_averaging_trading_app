@@ -15,26 +15,27 @@ class MainLayout extends StatelessWidget {
     final bool isDesktop = MediaQuery.of(context).size.width >= 600;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const ResponsiveText(
-          'Cost Averaging Trading App',
-          style: TextStyle(fontSize: 20),
-        ),
-        automaticallyImplyLeading: !isDesktop,
-        actions: [
-          BlocBuilder<SettingsBloc, SettingsState>(
-            builder: (context, state) {
-              if (state is SettingsLoaded && state.isDemoMode) {
-                return const Chip(
-                  label: Text('Demo Mode'),
-                  backgroundColor: Colors.orange,
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
-      ),
+      // Rimuoviamo l'AppBar
+      // appBar: AppBar(
+      //   title: const ResponsiveText(
+      //     'Cost Averaging Trading App',
+      //     style: TextStyle(fontSize: 20),
+      //   ),
+      //   automaticallyImplyLeading: !isDesktop,
+      //   actions: [
+      //     BlocBuilder<SettingsBloc, SettingsState>(
+      //       builder: (context, state) {
+      //         if (state is SettingsLoaded && state.isDemoMode) {
+      //           return const Chip(
+      //             label: Text('Demo Mode'),
+      //             backgroundColor: Colors.orange,
+      //           );
+      //         }
+      //         return const SizedBox.shrink();
+      //       },
+      //     ),
+      //   ],
+      // ),
       drawer: isDesktop ? null : const AppDrawer(),
       body: SafeArea(
         child: Row(

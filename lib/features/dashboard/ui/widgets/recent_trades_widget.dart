@@ -25,68 +25,66 @@ class RecentTradesWidget extends StatelessWidget {
         .take(tradesPerPage)
         .toList();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Recent Trades',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        if (displayedTrades.isEmpty)
+          const Text('No recent trades')
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: displayedTrades.length,
+            itemBuilder: (context, index) {
+              final trade = displayedTrades[index];
+              return _buildTradeItem(trade);
+            },
+          ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Recent Trades',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: displayedTrades.length,
-              itemBuilder: (context, index) {
-                final trade = displayedTrades[index];
-                return _buildTradeItem(trade);
-              },
-            ),
-            const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left),
-                      onPressed: currentPage > 1
-                          ? () => onPageChanged(currentPage - 1)
-                          : null,
-                    ),
-                    Text('$currentPage'),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right),
-                      onPressed: currentPage * tradesPerPage < trades.length
-                          ? () => onPageChanged(currentPage + 1)
-                          : null,
-                    ),
-                  ],
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: currentPage > 1
+                      ? () => onPageChanged(currentPage - 1)
+                      : null,
                 ),
-                DropdownButton<int>(
-                  value: tradesPerPage,
-                  items: [5, 10, 20].map((int value) {
-                    return DropdownMenuItem<int>(
-                      value: value,
-                      child: Text('$value'),
-                    );
-                  }).toList(),
-                  onChanged: (int? newValue) {
-                    if (newValue != null) {
-                      onChangeTradesPerPage(newValue);
-                    }
-                  },
-                  isDense: true,
-                  underline: Container(),
+                Text('$currentPage'),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: currentPage * tradesPerPage < trades.length
+                      ? () => onPageChanged(currentPage + 1)
+                      : null,
                 ),
               ],
             ),
+            DropdownButton<int>(
+              value: tradesPerPage,
+              items: [5, 10, 20].map((int value) {
+                return DropdownMenuItem<int>(
+                  value: value,
+                  child: Text('$value'),
+                );
+              }).toList(),
+              onChanged: (int? newValue) {
+                if (newValue != null) {
+                  onChangeTradesPerPage(newValue);
+                }
+              },
+              isDense: true,
+              underline: Container(),
+            ),
           ],
         ),
-      ),
+      ],
     );
   }
 

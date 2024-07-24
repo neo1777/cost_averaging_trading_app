@@ -207,8 +207,9 @@ class DatabaseService {
 
   Future<void> checkAndCleanupOldData() async {
     Database db = await database;
-    final thirtyDaysAgo =
-        DateTime.now().subtract(Duration(days: 30)).millisecondsSinceEpoch;
+    final thirtyDaysAgo = DateTime.now()
+        .subtract(const Duration(days: 30))
+        .millisecondsSinceEpoch;
 
     await db.delete('price_history',
         where: 'timestamp < ?', whereArgs: [thirtyDaysAgo]);
