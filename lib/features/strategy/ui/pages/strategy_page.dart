@@ -7,6 +7,7 @@ import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy
 import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_monitor.dart';
 import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_control_panel.dart';
 import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/backtest_result_view.dart';
+import 'package:cost_averaging_trading_app/features/strategy/ui/widgets/strategy_status.dart';
 import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 
 class StrategyPage extends StatelessWidget {
@@ -34,6 +35,26 @@ class StrategyPage extends StatelessWidget {
       return [const Center(child: CircularProgressIndicator())];
     } else if (state is StrategyLoaded) {
       return [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: StrategyStatusWidget(
+              status: state.status == StrategyStateStatus.active
+                  ? StrategyStatus.active
+                  : StrategyStatus.inactive,
+              onStart: () =>
+                  context.read<StrategyBloc>().add(StartStrategyEvent()),
+              onStop: () => context.read<StrategyBloc>().add(StopStrategy()),
+              onSellEntirePortfolio: () => context.read<StrategyBloc>().add(
+                    SellEntirePortfolio(
+                      symbol: state.parameters.symbol,
+                      targetProfit: state.parameters.targetProfitPercentage,
+                    ),
+                  ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
