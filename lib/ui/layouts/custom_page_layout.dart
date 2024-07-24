@@ -10,12 +10,12 @@ class CustomPageLayout extends StatelessWidget {
   final bool useSliver;
 
   const CustomPageLayout({
-    Key? key,
+    super.key,
     required this.title,
     required this.children,
     this.floatingActionButton,
     this.useSliver = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

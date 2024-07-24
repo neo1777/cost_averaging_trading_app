@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
 import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_bloc.dart';
 import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_state.dart';
 import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_event.dart';
@@ -10,7 +9,7 @@ import 'package:cost_averaging_trading_app/features/portfolio/ui/widgets/portfol
 import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 
 class PortfolioPage extends StatelessWidget {
-  const PortfolioPage({Key? key}) : super(key: key);
+  const PortfolioPage({super.key});
 
   @override
   Widget build(BuildContext context) {

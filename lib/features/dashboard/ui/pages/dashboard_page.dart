@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_state.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
@@ -13,7 +12,7 @@ import 'package:cost_averaging_trading_app/core/widgets/custom_candlestick_chart
 import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({Key? key}) : super(key: key);
+  const DashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {

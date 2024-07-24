@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
 import 'package:cost_averaging_trading_app/features/settings/blocs/settings_bloc.dart';
 import 'package:cost_averaging_trading_app/features/settings/blocs/settings_event.dart';
 import 'package:cost_averaging_trading_app/features/settings/blocs/settings_state.dart';
@@ -11,7 +10,7 @@ import 'package:cost_averaging_trading_app/features/settings/ui/widgets/risk_man
 import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({Key? key}) : super(key: key);
+  const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {

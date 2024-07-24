@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/widgets/shared_widgets.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_bloc.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_state.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_event.dart';
@@ -10,7 +9,7 @@ import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/tra
 import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 
 class TradeHistoryPage extends StatelessWidget {
-  const TradeHistoryPage({Key? key}) : super(key: key);
+  const TradeHistoryPage({super.key});
 
   @override
   Widget build(BuildContext context) {

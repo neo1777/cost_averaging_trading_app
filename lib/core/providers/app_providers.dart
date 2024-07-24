@@ -122,19 +122,14 @@ class AppProviders extends StatelessWidget {
 
   void _initializeDatabase(DatabaseService databaseService) {
     databaseService.initDatabase().then((_) async {
-      print("Database initialized successfully");
       bool isHealthy = await databaseService.isDatabaseHealthy();
       if (isHealthy) {
-        print("Database is healthy");
         await databaseService.performMaintenance();
         await databaseService.checkAndCleanupOldData();
         await databaseService.optimizeDatabasePerformance();
       } else {
-        print("Database health check failed. Attempting backup...");
         await databaseService.backupDatabase();
       }
-    }).catchError((error) {
-      print("Error initializing database: $error");
-    });
+    }).catchError((error) {});
   }
 }

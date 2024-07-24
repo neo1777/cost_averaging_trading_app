@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/features/settings/blocs/settings_bloc.dart';
-import 'package:cost_averaging_trading_app/features/settings/blocs/settings_state.dart';
 import 'package:cost_averaging_trading_app/routes.dart';
 import 'package:cost_averaging_trading_app/ui/widgets/responsive_text.dart';
 
