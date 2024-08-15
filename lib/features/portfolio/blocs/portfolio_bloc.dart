@@ -19,8 +19,14 @@ class PortfolioBloc extends Bloc<PortfolioEvent, PortfolioState> {
     try {
       final portfolio = await _repository.getPortfolio();
       final performanceData = await _repository.getPerformanceData();
+      final dailyChange = await _repository.getDailyChange();
+      final weeklyChange = await _repository.getWeeklyChange();
       emit(PortfolioLoaded(
-          portfolio: portfolio, performanceData: performanceData));
+        portfolio: portfolio,
+        performanceData: performanceData,
+        dailyChange: dailyChange,
+        weeklyChange: weeklyChange,
+      ));
     } catch (e, stackTrace) {
       ErrorHandler.logError('Error loading portfolio data', e, stackTrace);
       emit(PortfolioError(ErrorHandler.getUserFriendlyErrorMessage(e)));

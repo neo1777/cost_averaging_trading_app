@@ -1,6 +1,6 @@
-// lib/features/settings/ui/widgets/api_settings.dart
-
 import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_card.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_text_field.dart';
 
 class ApiSettings extends StatelessWidget {
   final String apiKey;
@@ -18,34 +18,25 @@ class ApiSettings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('API Settings', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            TextFormField(
-              initialValue: apiKey,
-              decoration: const InputDecoration(
-                labelText: 'API Key',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: onApiKeyChanged,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              initialValue: secretKey,
-              decoration: const InputDecoration(
-                labelText: 'Secret Key',
-                border: OutlineInputBorder(),
-              ),
-              obscureText: true,
-              onChanged: onSecretKeyChanged,
-            ),
-          ],
-        ),
+    return CustomCard(
+      title: 'API Settings',
+      child: Column(
+        children: [
+          CustomTextField(
+            label: 'API Key',
+            value: apiKey,
+            onChanged: onApiKeyChanged,
+            icon: Icons.vpn_key,
+          ),
+          const SizedBox(height: 16),
+          CustomTextField(
+            label: 'Secret Key',
+            value: secretKey,
+            onChanged: onSecretKeyChanged,
+            icon: Icons.lock,
+            obscureText: true,
+          ),
+        ],
       ),
     );
   }

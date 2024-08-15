@@ -35,68 +35,14 @@ class StrategyPage extends StatelessWidget {
       return [const Center(child: CircularProgressIndicator())];
     } else if (state is StrategyLoaded) {
       return [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: StrategyStatusWidget(
-              status: state.status == StrategyStateStatus.active
-                  ? StrategyStatus.active
-                  : StrategyStatus.inactive,
-              onStart: () =>
-                  context.read<StrategyBloc>().add(StartStrategyEvent()),
-              onStop: () => context.read<StrategyBloc>().add(StopStrategy()),
-              onSellEntirePortfolio: () => context.read<StrategyBloc>().add(
-                    SellEntirePortfolio(
-                      symbol: state.parameters.symbol,
-                      targetProfit: state.parameters.targetProfitPercentage,
-                    ),
-                  ),
-            ),
-          ),
-        ),
+        _buildStrategyStatus(context, state),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: StrategyParametersForm(
-              initialParameters: state.parameters,
-              onParametersChanged: (parameters) {
-                context
-                    .read<StrategyBloc>()
-                    .add(UpdateStrategyParameters(parameters));
-              },
-            ),
-          ),
-        ),
+        _buildStrategyParametersForm(context, state),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: StrategyControlPanel(
-              isRunning: state.status == StrategyStateStatus.active,
-              onStartLive: () =>
-                  context.read<StrategyBloc>().add(StartLiveStrategy()),
-              onStartDemo: () =>
-                  context.read<StrategyBloc>().add(StartDemoStrategy()),
-              onStop: () => context.read<StrategyBloc>().add(StopStrategy()),
-              onBacktest: () => _showBacktestDialog(context),
-            ),
-          ),
-        ),
+        _buildStrategyControlPanel(context, state),
+        const SizedBox(height: 16),
         if (state.status == StrategyStateStatus.active)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: StrategyMonitor(
-                totalInvested: state.totalInvested,
-                currentProfit: state.currentProfit,
-                tradeCount: state.tradeCount,
-                averageBuyPrice: state.averageBuyPrice,
-                currentMarketPrice: state.currentMarketPrice,
-                recentTrades: state.recentTrades,
-              ),
-            ),
-          ),
+          _buildStrategyMonitor(state),
       ];
     } else if (state is BacktestCompleted) {
       return [BacktestResultView(result: state.result)];
@@ -106,6 +52,78 @@ class StrategyPage extends StatelessWidget {
       return [Center(child: Text('Strategy Error: ${state.message}'))];
     }
     return [const Center(child: Text('Unknown state'))];
+  }
+
+  Widget _buildStrategyStatus(BuildContext context, StrategyLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: StrategyStatusWidget(
+          status: state.status == StrategyStateStatus.active
+              ? StrategyStatus.active
+              : StrategyStatus.inactive,
+          onStart: () => context.read<StrategyBloc>().add(StartStrategyEvent()),
+          onStop: () => context.read<StrategyBloc>().add(StopStrategy()),
+          onSellEntirePortfolio: () => context.read<StrategyBloc>().add(
+                SellEntirePortfolio(
+                  symbol: state.parameters.symbol,
+                  targetProfit: state.parameters.targetProfitPercentage,
+                ),
+              ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStrategyParametersForm(
+      BuildContext context, StrategyLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: StrategyParametersForm(
+          initialParameters: state.parameters,
+          onParametersChanged: (parameters) {
+            context
+                .read<StrategyBloc>()
+                .add(UpdateStrategyParameters(parameters));
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStrategyControlPanel(
+      BuildContext context, StrategyLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: StrategyControlPanel(
+          isRunning: state.status == StrategyStateStatus.active,
+          onStartLive: () =>
+              context.read<StrategyBloc>().add(StartLiveStrategy()),
+          onStartDemo: () =>
+              context.read<StrategyBloc>().add(StartDemoStrategy()),
+          onStop: () => context.read<StrategyBloc>().add(StopStrategy()),
+          onBacktest: () => _showBacktestDialog(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStrategyMonitor(StrategyLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: StrategyMonitor(
+          totalInvested: state.totalInvested,
+          currentProfit: state.currentProfit,
+          tradeCount: state.tradeCount,
+          averageBuyPrice: state.averageBuyPrice,
+          currentMarketPrice: state.currentMarketPrice,
+          recentTrades: state.recentTrades,
+        ),
+      ),
+    );
   }
 
   void _showBacktestDialog(BuildContext context) {

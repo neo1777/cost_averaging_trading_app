@@ -1,5 +1,3 @@
-// lib/features/dashboard/ui/pages/dashboard_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
@@ -36,10 +34,13 @@ class DashboardPage extends StatelessWidget {
       return [const Center(child: CircularProgressIndicator())];
     } else if (state is DashboardLoaded) {
       return [
-        _buildOverviewSection(state),
-        _buildChartSection(state),
-        _buildRecentTradesSection(context, state),
-        _buildPerformanceSection(state),
+        _buildPortfolioOverview(context, state),
+        const SizedBox(height: 16),
+        _buildMarketChart(context, state),
+        const SizedBox(height: 16),
+        _buildRecentTrades(context, state),
+        const SizedBox(height: 16),
+        _buildPerformanceSummary(context, state),
       ];
     } else if (state is DashboardError) {
       return [Center(child: Text('Error: ${state.message}'))];
@@ -47,24 +48,27 @@ class DashboardPage extends StatelessWidget {
     return [const Center(child: Text('Unknown state'))];
   }
 
-  Widget _buildOverviewSection(DashboardLoaded state) {
+  Widget _buildPortfolioOverview(BuildContext context, DashboardLoaded state) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: PortfolioOverview(portfolio: state.portfolio),
+        child: PortfolioOverview(
+          totalValue: state.portfolio.totalValue,
+          dailyChange: state.dailyChange,
+          assets: state.portfolio.assets,
+        ),
       ),
     );
   }
 
-  Widget _buildChartSection(DashboardLoaded state) {
+  Widget _buildMarketChart(BuildContext context, DashboardLoaded state) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Market Chart',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Market Chart', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             SizedBox(
               height: 300,
@@ -79,32 +83,74 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentTradesSection(
-      BuildContext context, DashboardLoaded state) {
+  Widget _buildRecentTrades(BuildContext context, DashboardLoaded state) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: RecentTradesWidget(
-          trades: state.recentTrades,
-          currentPage: state.currentPage,
-          tradesPerPage: state.tradesPerPage,
-          onPageChanged: (newPage) {
-            context.read<DashboardBloc>().add(ChangePage(newPage));
-          },
-          onChangeTradesPerPage: (newValue) {
-            context.read<DashboardBloc>().add(ChangeTradesPerPage(newValue));
-          },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Recent Trades',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            RecentTradesWidget(
+              trades: state.recentTrades,
+              onViewAllTrades: () {
+                // Navigate to Trade History page
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildPerformanceSection(DashboardLoaded state) {
+  Widget _buildPerformanceSummary(BuildContext context, DashboardLoaded state) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: PerformanceChart(performanceData: state.performanceData),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Performance Summary',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildPerformanceItem(
+                    context, 'Daily P/L', state.dailyProfitLoss),
+                _buildPerformanceItem(
+                    context, 'Weekly P/L', state.weeklyProfitLoss),
+                _buildPerformanceItem(
+                    context, 'Monthly P/L', state.monthlyProfitLoss),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 100,
+              child: PerformanceChart(data: state.performanceData),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildPerformanceItem(
+      BuildContext context, String label, double value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          '${value >= 0 ? '+' : ''}${value.toStringAsFixed(2)}',
+          style: TextStyle(
+            color: value >= 0 ? Colors.green : Colors.red,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }

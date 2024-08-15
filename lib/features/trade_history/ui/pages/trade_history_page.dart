@@ -33,40 +33,79 @@ class TradeHistoryPage extends StatelessWidget {
       return [const Center(child: CircularProgressIndicator())];
     } else if (state is TradeHistoryLoaded) {
       return [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TradeFilters(
-              onFilterApplied: (startDate, endDate, assetPair) {
-                context.read<TradeHistoryBloc>().add(
-                      FilterTradeHistory(
-                        startDate: startDate,
-                        endDate: endDate,
-                        assetPair: assetPair,
-                      ),
-                    );
-              },
-            ),
-          ),
-        ),
+        _buildFilters(context),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TradeStats(stats: state.statistics),
-          ),
-        ),
+        _buildTradeStats(state),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TradeList(trades: state.trades),
-          ),
-        ),
+        _buildTradeList(state),
+        const SizedBox(height: 16),
+        _buildPagination(context, state),
       ];
     } else if (state is TradeHistoryError) {
       return [Center(child: Text('Error: ${state.message}'))];
     }
     return [const Center(child: Text('Unknown state'))];
+  }
+
+  Widget _buildFilters(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: TradeFilters(
+          onFilterApplied: (startDate, endDate, assetPair) {
+            context.read<TradeHistoryBloc>().add(
+                  FilterTradeHistory(
+                    startDate: startDate,
+                    endDate: endDate,
+                    assetPair: assetPair,
+                  ),
+                );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTradeStats(TradeHistoryLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: TradeStats(stats: state.statistics),
+      ),
+    );
+  }
+
+  Widget _buildTradeList(TradeHistoryLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: TradeList(trades: state.trades),
+      ),
+    );
+  }
+
+  Widget _buildPagination(BuildContext context, TradeHistoryLoaded state) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: state.currentPage > 1
+              ? () => context
+                  .read<TradeHistoryBloc>()
+                  .add(ChangePage(state.currentPage - 1))
+              : null,
+        ),
+        Text('Page ${state.currentPage}'),
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: state.currentPage < state.totalPages
+              ? () => context
+                  .read<TradeHistoryBloc>()
+                  .add(ChangePage(state.currentPage + 1))
+              : null,
+        ),
+      ],
+    );
   }
 }

@@ -1,6 +1,5 @@
-// lib/features/portfolio/ui/widgets/asset_list.dart
-
 import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_card.dart';
 
 class AssetList extends StatelessWidget {
   final Map<String, double> assets;
@@ -9,35 +8,26 @@ class AssetList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Assets',
-              style: Theme.of(context).textTheme.titleLarge,
+    return CustomCard(
+      title: 'Assets',
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: assets.length,
+        itemBuilder: (context, index) {
+          final asset = assets.entries.elementAt(index);
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.blue,
+              child: Text(asset.key[0]),
             ),
-            const SizedBox(height: 16),
-            ...assets.entries
-                .map((entry) => _buildAssetItem(entry.key, entry.value))
-                ,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAssetItem(String asset, double amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(asset),
-          Text(amount.toStringAsFixed(8)),
-        ],
+            title: Text(asset.key),
+            trailing: Text(
+              asset.value.toStringAsFixed(8),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          );
+        },
       ),
     );
   }

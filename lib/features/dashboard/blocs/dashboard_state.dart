@@ -18,46 +18,33 @@ class DashboardLoaded extends DashboardState {
   final Portfolio portfolio;
   final List<CoreTrade> recentTrades;
   final List<Map<String, dynamic>> performanceData;
-  final int currentPage;
-  final int tradesPerPage;
-  final StrategyParameters? activeStrategy; // Aggiunto questo campo
+  final StrategyParameters? activeStrategy;
+  final double dailyChange;
+  final double dailyProfitLoss;
+  final double weeklyProfitLoss;
+  final double monthlyProfitLoss;
 
   const DashboardLoaded({
     required this.portfolio,
     required this.recentTrades,
     required this.performanceData,
-    required this.currentPage,
-    required this.tradesPerPage,
-    this.activeStrategy, // Aggiunto questo parametro
+    this.activeStrategy,
+    required this.dailyChange,
+    required this.dailyProfitLoss,
+    required this.weeklyProfitLoss,
+    required this.monthlyProfitLoss,
   });
-
-  DashboardLoaded copyWith({
-    Portfolio? portfolio,
-    List<CoreTrade>? recentTrades,
-    List<Map<String, dynamic>>? performanceData,
-    int? currentPage,
-    int? tradesPerPage,
-    StrategyParameters? activeStrategy, // Aggiunto questo parametro
-  }) {
-    return DashboardLoaded(
-      portfolio: portfolio ?? this.portfolio,
-      recentTrades: recentTrades ?? this.recentTrades,
-      performanceData: performanceData ?? this.performanceData,
-      currentPage: currentPage ?? this.currentPage,
-      tradesPerPage: tradesPerPage ?? this.tradesPerPage,
-      activeStrategy:
-          activeStrategy ?? this.activeStrategy, // Aggiunto questo campo
-    );
-  }
 
   @override
   List<Object?> get props => [
         portfolio,
         recentTrades,
         performanceData,
-        currentPage,
-        tradesPerPage,
-        activeStrategy
+        activeStrategy,
+        dailyChange,
+        dailyProfitLoss,
+        weeklyProfitLoss,
+        monthlyProfitLoss,
       ];
 }
 

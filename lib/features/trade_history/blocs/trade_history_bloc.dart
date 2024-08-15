@@ -1,4 +1,3 @@
-import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_event.dart';
@@ -11,9 +10,7 @@ class TradeHistoryBloc extends Bloc<TradeHistoryEvent, TradeHistoryState> {
   TradeHistoryBloc(this._repository) : super(TradeHistoryInitial()) {
     on<LoadTradeHistory>(_onLoadTradeHistory);
     on<FilterTradeHistory>(_onFilterTradeHistory);
-
-    // Aggiungiamo questa riga per caricare i dati all'inizializzazione
-    add(LoadTradeHistory());
+    on<ChangePage>(_onChangePage);
   }
 
   Future<void> _onLoadTradeHistory(
@@ -22,9 +19,8 @@ class TradeHistoryBloc extends Bloc<TradeHistoryEvent, TradeHistoryState> {
   ) async {
     emit(TradeHistoryLoading());
     try {
-      final trades = await _repository.getTradeHistory();
-      final statistics = _calculateStatistics(trades);
-      emit(TradeHistoryLoaded(trades: trades, statistics: statistics));
+      final result = await _repository.getTradeHistory();
+      emit(_createLoadedState(result, 1));
     } catch (e, stackTrace) {
       ErrorHandler.logError('Error loading trade history', e, stackTrace);
       emit(TradeHistoryError(ErrorHandler.getUserFriendlyErrorMessage(e)));
@@ -37,50 +33,59 @@ class TradeHistoryBloc extends Bloc<TradeHistoryEvent, TradeHistoryState> {
   ) async {
     emit(TradeHistoryLoading());
     try {
-      final trades = await _repository.getFilteredTradeHistory(
+      final result = await _repository.getFilteredTradeHistory(
         startDate: event.startDate,
         endDate: event.endDate,
         assetPair: event.assetPair,
       );
-      final statistics = _calculateStatistics(trades);
-      emit(TradeHistoryLoaded(trades: trades, statistics: statistics));
+      emit(_createLoadedState(result, 1));
     } catch (e, stackTrace) {
       ErrorHandler.logError('Error filtering trade history', e, stackTrace);
       emit(TradeHistoryError(ErrorHandler.getUserFriendlyErrorMessage(e)));
     }
   }
 
-  Map<String, dynamic> _calculateStatistics(List<CoreTrade> trades) {
-    final totalTrades = trades.length;
-    final buyTrades =
-        trades.where((trade) => trade.type.name.toLowerCase() == 'buy').length;
-    final sellTrades = totalTrades - buyTrades;
-
-    double totalVolume = 0;
-    double totalProfit = 0;
-    Map<String, double> assetVolumes = {};
-
-    for (var trade in trades) {
-      final tradeVolume = trade.amount * trade.price;
-      totalVolume += tradeVolume;
-
-      if (trade.type.name.toLowerCase() == 'sell') {
-        totalProfit += tradeVolume;
-      } else {
-        totalProfit -= tradeVolume;
+  Future<void> _onChangePage(
+    ChangePage event,
+    Emitter<TradeHistoryState> emit,
+  ) async {
+    if (state is TradeHistoryLoaded) {
+      final currentState = state as TradeHistoryLoaded;
+      emit(TradeHistoryLoading());
+      try {
+        final result = await _repository.getTradeHistoryPage(event.pageNumber);
+        emit(_createLoadedState(
+            result, event.pageNumber, currentState.totalPages));
+      } catch (e, stackTrace) {
+        ErrorHandler.logError('Error changing page', e, stackTrace);
+        emit(TradeHistoryError(ErrorHandler.getUserFriendlyErrorMessage(e)));
       }
-
-      assetVolumes[trade.symbol] =
-          (assetVolumes[trade.symbol] ?? 0) + tradeVolume;
     }
-
-    return {
-      'totalTrades': totalTrades,
-      'buyTrades': buyTrades,
-      'sellTrades': sellTrades,
-      'totalVolume': totalVolume,
-      'totalProfit': totalProfit,
-      'assetVolumes': assetVolumes,
-    };
   }
+
+
+  TradeHistoryLoaded _createLoadedState(
+      TradeHistoryResult result, int currentPage,
+      [int? totalPages]) {
+    return TradeHistoryLoaded(
+      trades: result.trades,
+      statistics: {
+        'totalTrades': result.statistics['totalTrades'] ?? 0,
+        'profitableTrades': result.statistics['profitableTrades'] ?? 0,
+        'totalProfit': result.statistics['totalProfit'] ?? 0.0,
+        'winRate': result.statistics['winRate'] ?? 0.0,
+        'averageProfit': result.statistics['averageProfit'] ?? 0.0,
+        'averageLoss': result.statistics['averageLoss'] ?? 0.0,
+        'assetVolumes':
+            (result.statistics['assetVolumes'] as Map<dynamic, dynamic>?)?.map(
+                  (key, value) =>
+                      MapEntry(key.toString(), (value as num).toDouble()),
+                ) ??
+                {},
+      },
+      currentPage: currentPage,
+      totalPages: totalPages ?? result.totalPages,
+    );
+  }
+
 }

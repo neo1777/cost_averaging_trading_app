@@ -33,30 +33,57 @@ class PortfolioPage extends StatelessWidget {
       return [const Center(child: CircularProgressIndicator())];
     } else if (state is PortfolioLoaded) {
       return [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: PortfolioSummary(totalValue: state.portfolio.totalValue),
-          ),
-        ),
+        _buildPortfolioSummary(state),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: PortfolioChart(chartData: state.performanceData),
-          ),
-        ),
+        _buildPortfolioChart(state),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: AssetList(assets: state.portfolio.assets),
-          ),
-        ),
+        _buildAssetList(state),
+        const SizedBox(height: 16),
+        _buildExportButton(context),
       ];
     } else if (state is PortfolioError) {
       return [Center(child: Text('Error: ${state.message}'))];
     }
     return [const Center(child: Text('Unknown state'))];
+  }
+
+  Widget _buildPortfolioSummary(PortfolioLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: PortfolioSummary(
+          totalValue: state.portfolio.totalValue,
+          dailyChange: state.dailyChange,
+          weeklyChange: state.weeklyChange,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortfolioChart(PortfolioLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: PortfolioChart(chartData: state.performanceData),
+      ),
+    );
+  }
+
+  Widget _buildAssetList(PortfolioLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: AssetList(assets: state.portfolio.assets),
+      ),
+    );
+  }
+
+  Widget _buildExportButton(BuildContext context) {
+    return ElevatedButton(
+      onPressed: () {
+        // Implement export functionality
+      },
+      child: const Text('Export Report'),
+    );
   }
 }

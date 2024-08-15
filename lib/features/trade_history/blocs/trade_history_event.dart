@@ -9,3 +9,9 @@ class FilterTradeHistory extends TradeHistoryEvent {
 
   FilterTradeHistory({this.startDate, this.endDate, this.assetPair});
 }
+
+class ChangePage extends TradeHistoryEvent {
+  final int pageNumber;
+
+  ChangePage(this.pageNumber);
+}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_card.dart';
 
 class DemoModeToggle extends StatelessWidget {
   final bool isDemoMode;
@@ -12,19 +13,13 @@ class DemoModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Demo Mode', style: Theme.of(context).textTheme.titleMedium),
-            Switch(
-              value: isDemoMode,
-              onChanged: onToggle,
-            ),
-          ],
-        ),
+    return CustomCard(
+      title: 'Trading Mode',
+      child: SwitchListTile(
+        title: const Text('Demo Mode'),
+        subtitle: const Text('Practice trading without real funds'),
+        value: isDemoMode,
+        onChanged: onToggle,
       ),
     );
   }

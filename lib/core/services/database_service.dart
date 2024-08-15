@@ -1,11 +1,12 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:convert';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
 
 class DatabaseService {
   static Database? _database;
   static const String _databaseName = 'trading_strategy_40.db';
-  static const int _databaseVersion = 3;
+  static const int _databaseVersion = 4;
 
   Future<void> initDatabase() async {
     if (_database != null) return;
@@ -88,6 +89,21 @@ class DatabaseService {
     ''');
 
     await db.execute('''
+      CREATE TABLE portfolio_value (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        value REAL NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE active_strategy (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        strategy_parameters TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
       CREATE INDEX idx_trades_symbol ON trades(symbol)
     ''');
 
@@ -109,6 +125,22 @@ class DatabaseService {
           assets TEXT NOT NULL,
           totalValue REAL NOT NULL,
           lastUpdated INTEGER NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS portfolio_value (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          value REAL NOT NULL
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS active_strategy (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          strategy_parameters TEXT NOT NULL
         )
       ''');
     }
@@ -220,5 +252,41 @@ class DatabaseService {
   Future<void> optimizeDatabasePerformance() async {
     Database db = await database;
     await db.execute('PRAGMA optimize');
+  }
+
+  Future<StrategyParameters?> getActiveStrategy() async {
+    final db = await database;
+    final results = await db.query('active_strategy', limit: 1);
+    if (results.isNotEmpty) {
+      final json = results.first['strategy_parameters'] as String;
+      return StrategyParameters.fromJson(jsonDecode(json));
+    }
+    return null;
+  }
+
+  Future<double> getPortfolioValueForDate(DateTime date) async {
+    final db = await database;
+    final results = await db.query(
+      'portfolio_value',
+      where: 'date = ?',
+      whereArgs: [date.toIso8601String().split('T')[0]],
+      limit: 1,
+    );
+    if (results.isNotEmpty) {
+      return results.first['value'] as double;
+    }
+    return 0.0;
+  }
+
+  Future<void> savePortfolioValue(DateTime date, double value) async {
+    final db = await database;
+    await db.insert(
+      'portfolio_value',
+      {
+        'date': date.toIso8601String().split('T')[0],
+        'value': value,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 }

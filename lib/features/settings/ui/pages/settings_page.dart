@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/features/settings/blocs/settings_bloc.dart';
-import 'package:cost_averaging_trading_app/features/settings/blocs/settings_event.dart';
 import 'package:cost_averaging_trading_app/features/settings/blocs/settings_state.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_event.dart';
 import 'package:cost_averaging_trading_app/features/settings/ui/widgets/api_settings.dart';
 import 'package:cost_averaging_trading_app/features/settings/ui/widgets/backtesting_settings.dart';
 import 'package:cost_averaging_trading_app/features/settings/ui/widgets/demo_mode_toggle.dart';
@@ -25,96 +25,112 @@ class SettingsPage extends StatelessWidget {
       builder: (context, state) {
         return CustomPageLayout(
           title: 'Settings',
-          useSliver: false, // Using standard layout for settings
-          children: _buildSettingsContent(context, state),
+          useSliver: false,
+          children: [
+            _buildSearchBar(context),
+            const SizedBox(height: 16),
+            _buildApiSettings(context, state),
+            const SizedBox(height: 16),
+            _buildDemoModeToggle(context, state),
+            const SizedBox(height: 16),
+            _buildBacktestingSettings(context, state),
+            const SizedBox(height: 16),
+            _buildRiskManagement(context, state),
+          ],
         );
       },
     );
   }
 
-  List<Widget> _buildSettingsContent(
-      BuildContext context, SettingsState state) {
-    if (state is SettingsLoading) {
-      return [const Center(child: CircularProgressIndicator())];
-    } else if (state is SettingsLoaded) {
-      return [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ApiSettings(
-              apiKey: state.apiKey,
-              secretKey: state.secretKey,
-              onApiKeyChanged: (newKey) {
-                context.read<SettingsBloc>().add(UpdateApiKey(newKey));
-              },
-              onSecretKeyChanged: (newKey) {
-                context.read<SettingsBloc>().add(UpdateSecretKey(newKey));
-              },
-            ),
+  Widget _buildSearchBar(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: TextField(
+          decoration: const InputDecoration(
+            hintText: 'Search settings...',
+            prefixIcon: Icon(Icons.search),
+            border: InputBorder.none,
           ),
+          onChanged: (value) {
+            // Implement search functionality
+          },
         ),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: DemoModeToggle(
-              isDemoMode: state.isDemoMode,
-              onToggle: (isDemo) {
-                context.read<SettingsBloc>().add(ToggleDemoMode());
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: BacktestingSettings(
-              isBacktestingEnabled: state.isBacktestingEnabled,
-              onToggleBacktesting: () {
-                context.read<SettingsBloc>().add(ToggleBacktesting());
-              },
-              onRunBacktest: () {
-                // Implement backtesting logic
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: RiskManagement(
-              maxLossPercentage: state.maxLossPercentage,
-              maxConcurrentTrades: state.maxConcurrentTrades,
-              maxPositionSizePercentage: state.maxPositionSizePercentage,
-              dailyExposureLimit: state.dailyExposureLimit,
-              maxAllowedVolatility: state.maxAllowedVolatility,
-              maxRebuyCount: state.maxRebuyCount,
-              onUpdateRiskManagement: (
+      ),
+    );
+  }
+
+  Widget _buildApiSettings(BuildContext context, SettingsState state) {
+    if (state is SettingsLoaded) {
+      return ApiSettings(
+        apiKey: state.apiKey,
+        secretKey: state.secretKey,
+        onApiKeyChanged: (newKey) {
+          context.read<SettingsBloc>().add(UpdateApiKey(newKey));
+        },
+        onSecretKeyChanged: (newKey) {
+          context.read<SettingsBloc>().add(UpdateSecretKey(newKey));
+        },
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildDemoModeToggle(BuildContext context, SettingsState state) {
+    if (state is SettingsLoaded) {
+      return DemoModeToggle(
+        isDemoMode: state.isDemoMode,
+        onToggle: (isDemo) {
+          context.read<SettingsBloc>().add(ToggleDemoMode());
+        },
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildBacktestingSettings(BuildContext context, SettingsState state) {
+    if (state is SettingsLoaded) {
+      return BacktestingSettings(
+        isBacktestingEnabled: state.isBacktestingEnabled,
+        onToggleBacktesting: () {
+          context.read<SettingsBloc>().add(ToggleBacktesting());
+        },
+        onRunBacktest: () {
+          // Implement backtesting logic
+        },
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildRiskManagement(BuildContext context, SettingsState state) {
+    if (state is SettingsLoaded) {
+      return RiskManagement(
+        maxLossPercentage: state.maxLossPercentage,
+        maxConcurrentTrades: state.maxConcurrentTrades,
+        maxPositionSizePercentage: state.maxPositionSizePercentage,
+        dailyExposureLimit: state.dailyExposureLimit,
+        maxAllowedVolatility: state.maxAllowedVolatility,
+        maxRebuyCount: state.maxRebuyCount,
+        onUpdateRiskManagement: (
+          maxLoss,
+          maxTrades,
+          maxPositionSize,
+          dailyExposure,
+          maxVolatility,
+          rebuyCount,
+        ) {
+          context.read<SettingsBloc>().add(UpdateRiskManagement(
                 maxLoss,
                 maxTrades,
                 maxPositionSize,
                 dailyExposure,
                 maxVolatility,
                 rebuyCount,
-              ) {
-                context.read<SettingsBloc>().add(UpdateRiskManagement(
-                      maxLoss,
-                      maxTrades,
-                      maxPositionSize,
-                      dailyExposure,
-                      maxVolatility,
-                      rebuyCount,
-                    ));
-              },
-            ),
-          ),
-        ),
-      ];
-    } else if (state is SettingsError) {
-      return [Center(child: Text('Error: ${state.message}'))];
+              ));
+        },
+      );
     }
-    return [const Center(child: Text('Unknown state'))];
+    return const SizedBox.shrink();
   }
 }

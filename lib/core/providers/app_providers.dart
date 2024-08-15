@@ -91,7 +91,7 @@ class AppProviders extends StatelessWidget {
           BlocProvider<DashboardBloc>(
             create: (context) => DashboardBloc(
               context.read<DashboardRepository>(),
-              context.read<StrategyRepository>(),
+              //context.read<StrategyRepository>(),
             ),
           ),
           BlocProvider<PortfolioBloc>(

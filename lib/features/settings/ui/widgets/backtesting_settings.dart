@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_card.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_button.dart';
 
 class BacktestingSettings extends StatelessWidget {
   final bool isBacktestingEnabled;
@@ -14,32 +16,23 @@ class BacktestingSettings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Backtesting', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Enable Backtesting',
-                    style: Theme.of(context).textTheme.titleMedium),
-                Switch(
-                  value: isBacktestingEnabled,
-                  onChanged: (_) => onToggleBacktesting(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: isBacktestingEnabled ? onRunBacktest : null,
-              child: const Text('Run Backtest'),
-            ),
-          ],
-        ),
+    return CustomCard(
+      title: 'Backtesting',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            title: const Text('Enable Backtesting'),
+            value: isBacktestingEnabled,
+            onChanged: (value) => onToggleBacktesting(),
+          ),
+          const SizedBox(height: 16),
+          CustomButton(
+            label: 'Run Backtest',
+            onPressed: isBacktestingEnabled ? onRunBacktest : null,
+            icon: Icons.play_arrow,
+          ),
+        ],
       ),
     );
   }

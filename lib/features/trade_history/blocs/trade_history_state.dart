@@ -9,8 +9,15 @@ class TradeHistoryLoading extends TradeHistoryState {}
 class TradeHistoryLoaded extends TradeHistoryState {
   final List<CoreTrade> trades;
   final Map<String, dynamic> statistics;
+  final int currentPage;
+  final int totalPages;
 
-  TradeHistoryLoaded({required this.trades, required this.statistics});
+  TradeHistoryLoaded({
+    required this.trades,
+    required this.statistics,
+    required this.currentPage,
+    required this.totalPages,
+  });
 }
 
 class TradeHistoryError extends TradeHistoryState {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_text_field.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_card.dart';
 
 class StrategyParametersForm extends StatefulWidget {
   final StrategyParameters initialParameters;
@@ -28,60 +30,57 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
   @override
   void initState() {
     super.initState();
-    _symbolController =
-        TextEditingController(text: widget.initialParameters.symbol);
-    _investmentAmountController = TextEditingController(
-        text: widget.initialParameters.investmentAmount.toString());
-    _purchaseFrequencyController = TextEditingController(
-        text: widget.initialParameters.purchaseFrequency.toString());
-    _targetProfitPercentageController = TextEditingController(
-        text: widget.initialParameters.targetProfitPercentage.toString());
-    _stopLossPercentageController = TextEditingController(
-        text: widget.initialParameters.stopLossPercentage.toString());
+    _symbolController = TextEditingController(text: widget.initialParameters.symbol);
+    _investmentAmountController = TextEditingController(text: widget.initialParameters.investmentAmount.toString());
+    _purchaseFrequencyController = TextEditingController(text: widget.initialParameters.purchaseFrequency.toString());
+    _targetProfitPercentageController = TextEditingController(text: widget.initialParameters.targetProfitPercentage.toString());
+    _stopLossPercentageController = TextEditingController(text: widget.initialParameters.stopLossPercentage.toString());
     _useAutoMinTradeAmount = widget.initialParameters.useAutoMinTradeAmount;
-    _isVariableInvestmentAmount =
-        widget.initialParameters.isVariableInvestmentAmount;
+    _isVariableInvestmentAmount = widget.initialParameters.isVariableInvestmentAmount;
     _reinvestProfits = widget.initialParameters.reinvestProfits;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Form(
+    return CustomCard(
+      title: 'Strategy Parameters',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextFormField(
+          CustomTextField(
             controller: _symbolController,
-            decoration: const InputDecoration(
-                labelText: 'Trading Symbol (e.g., BTCUSDT)'),
+            label: 'Trading Symbol (e.g., BTCUSDT)',
             onChanged: (_) => _updateParameters(),
           ),
-          TextFormField(
+          const SizedBox(height: 16),
+          CustomTextField(
             controller: _investmentAmountController,
-            decoration: const InputDecoration(
-                labelText: 'Investment Amount per Purchase'),
+            label: 'Investment Amount per Purchase',
             keyboardType: TextInputType.number,
             onChanged: (_) => _updateParameters(),
           ),
-          TextFormField(
+          const SizedBox(height: 16),
+          CustomTextField(
             controller: _purchaseFrequencyController,
-            decoration: const InputDecoration(
-                labelText: 'Purchase Frequency (in hours)'),
+            label: 'Purchase Frequency (in hours)',
             keyboardType: TextInputType.number,
             onChanged: (_) => _updateParameters(),
-          ),
-          TextFormField(
+            ),
+          const SizedBox(height: 16),
+          CustomTextField(
             controller: _targetProfitPercentageController,
-            decoration: const InputDecoration(labelText: 'Target Profit (%)'),
+            label: 'Target Profit (%)',
             keyboardType: TextInputType.number,
             onChanged: (_) => _updateParameters(),
           ),
-          TextFormField(
+          const SizedBox(height: 16),
+          CustomTextField(
             controller: _stopLossPercentageController,
-            decoration: const InputDecoration(labelText: 'Stop Loss (%)'),
+            label: 'Stop Loss (%)',
             keyboardType: TextInputType.number,
             onChanged: (_) => _updateParameters(),
           ),
+          const SizedBox(height: 16),
           SwitchListTile(
             title: const Text('Use Auto Minimum Trade Amount'),
             value: _useAutoMinTradeAmount,
@@ -122,19 +121,15 @@ class StrategyParametersFormState extends State<StrategyParametersForm> {
       symbol: _symbolController.text,
       investmentAmount: double.tryParse(_investmentAmountController.text) ?? 0,
       purchaseFrequency: int.tryParse(_purchaseFrequencyController.text) ?? 0,
-      targetProfitPercentage:
-          double.tryParse(_targetProfitPercentageController.text) ?? 0,
-      stopLossPercentage:
-          double.tryParse(_stopLossPercentageController.text) ?? 0,
+      targetProfitPercentage: double.tryParse(_targetProfitPercentageController.text) ?? 0,
+      stopLossPercentage: double.tryParse(_stopLossPercentageController.text) ?? 0,
       useAutoMinTradeAmount: _useAutoMinTradeAmount,
       isVariableInvestmentAmount: _isVariableInvestmentAmount,
       reinvestProfits: _reinvestProfits,
-      // Altri parametri rimangono invariati
       intervalDays: widget.initialParameters.intervalDays,
       maxInvestmentSize: widget.initialParameters.maxInvestmentSize,
       manualMinTradeAmount: widget.initialParameters.manualMinTradeAmount,
-      variableInvestmentPercentage:
-          widget.initialParameters.variableInvestmentPercentage,
+      variableInvestmentPercentage: widget.initialParameters.variableInvestmentPercentage,
     );
     widget.onParametersChanged(updatedParameters);
   }
