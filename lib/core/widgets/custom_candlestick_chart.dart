@@ -55,23 +55,25 @@ class CustomCandlestickChartState extends State<CustomCandlestickChart> {
         builder: (context, state) {
           if (state is ChartLoading) {
             return const Center(child: CircularProgressIndicator());
-          } else if (state is ChartLoaded) {
+          } else if (state is ChartLoaded && state.candles.isNotEmpty) {
             return _buildChart(context, state);
           } else if (state is ChartError) {
             return Center(child: Text('Error: ${state.message}'));
           }
-          return const SizedBox.shrink();
+          return const Center(child: Text('No data available'));
         },
       ),
     );
   }
 
   Widget _buildChart(BuildContext context, ChartLoaded state) {
+    if (state.candles.isEmpty) {
+      return const Center(child: Text('No candle data available'));
+    }
     return Stack(
       children: [
         Candlesticks(
           candles: state.candles,
-          // Rimuovi onIntervalChange da qui
           actions: [
             ToolBarAction(
               onPressed: () => _chartBloc.add(ToggleOrderMarkers()),

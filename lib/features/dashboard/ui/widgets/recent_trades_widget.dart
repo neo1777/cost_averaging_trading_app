@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
+import 'package:intl/intl.dart';
 
 class RecentTradesWidget extends StatelessWidget {
   final List<CoreTrade> trades;
