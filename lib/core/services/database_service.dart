@@ -5,7 +5,7 @@ import 'package:cost_averaging_trading_app/features/strategy/models/strategy_par
 
 class DatabaseService {
   static Database? _database;
-  static const String _databaseName = 'trading_strategy_40.db';
+  static const String _databaseName = 'trading_strategy_1777_41.db';
   static const int _databaseVersion = 4;
 
   Future<void> initDatabase() async {

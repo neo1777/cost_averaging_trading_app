@@ -1,6 +1,7 @@
+import 'package:candlesticks/candlesticks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:candlesticks/candlesticks.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_bloc.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_state.dart';
@@ -42,124 +43,128 @@ class CustomCandlestickChartState extends State<CustomCandlestickChart> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: _chartBloc,
-      child: BlocConsumer<ChartBloc, ChartState>(
-        listener: (context, state) {
-          if (state is ChartError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
+    return BlocConsumer<ChartBloc, ChartState>(
+      bloc: _chartBloc,
+      listener: (context, state) {
+        if (state is ChartError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is ChartLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is ChartLoaded && state.candles.isNotEmpty) {
+          return _buildChart(context, state);
+        } else if (state is ChartError) {
+          return Center(child: Text('Error: ${state.message}'));
+        }
+        return const Center(child: Text('No data available'));
+      },
+    );
+  }
+
+  Widget _buildChart(BuildContext context, ChartLoaded state) {
+    final validCandles =
+        state.candles.where((candle) => candle.low != null).toList();
+
+    if (validCandles.isEmpty) {
+      return const Center(child: Text('No valid candle data available'));
+    }
+
+    return AspectRatio(
+      aspectRatio: 1.5,
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          barGroups: _createBarGroups(validCandles),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: _bottomTitles(),
+            leftTitles: _leftTitles(),
+            topTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: true,
+            getDrawingHorizontalLine: (value) {
+              return FlLine(
+                color: Colors.grey[300],
+                strokeWidth: 1,
+              );
+            },
+            getDrawingVerticalLine: (value) {
+              return FlLine(
+                color: Colors.grey[300],
+                strokeWidth: 1,
+              );
+            },
+          ),
+          borderData: FlBorderData(
+            show: true,
+            border: Border.all(color: Colors.grey[300]!, width: 1),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<BarChartGroupData> _createBarGroups(List<Candle> candles) {
+    return candles.asMap().entries.map((entry) {
+      final index = entry.key;
+      final candle = entry.value;
+      final open = candle.open;
+      final close = candle.close;
+      final high = candle.high;
+      final low = candle.low;
+
+      return BarChartGroupData(
+        x: index,
+        barRods: [
+          BarChartRodData(
+            toY: high,
+            fromY: low,
+            color: open > close ? Colors.red : Colors.green,
+            width: 8,
+          ),
+        ],
+      );
+    }).toList();
+  }
+
+  AxisTitles _bottomTitles() {
+    return AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        getTitlesWidget: (value, meta) {
+          final index = value.toInt();
+          if (index % 5 == 0) {
+            return Text(
+              '${index + 1}',
+              style: const TextStyle(color: Colors.black, fontSize: 10),
             );
           }
-        },
-        builder: (context, state) {
-          if (state is ChartLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is ChartLoaded && state.candles.isNotEmpty) {
-            return _buildChart(context, state);
-          } else if (state is ChartError) {
-            return Center(child: Text('Error: ${state.message}'));
-          }
-          return const Center(child: Text('No data available'));
+          return const SizedBox.shrink();
         },
       ),
     );
   }
 
-  Widget _buildChart(BuildContext context, ChartLoaded state) {
-    if (state.candles.isEmpty) {
-      return const Center(child: Text('No candle data available'));
-    }
-    return Stack(
-      children: [
-        Candlesticks(
-          candles: state.candles,
-          actions: [
-            ToolBarAction(
-              onPressed: () => _chartBloc.add(ToggleOrderMarkers()),
-              child: Icon(
-                state.showOrderMarkers
-                    ? Icons.visibility
-                    : Icons.visibility_off,
-              ),
-            ),
-            ToolBarAction(
-              onPressed: () => _showIntervalPicker(context),
-              child: const Text('Interval'),
-            ),
-          ],
-        ),
-        Positioned(
-          top: 10,
-          right: 10,
-          child: _buildIntervalMenu(context),
-        ),
-        if (state.showOrderMarkers) ..._buildOrderMarkers(context, state),
-      ],
-    );
-  }
-
-  Widget _buildIntervalMenu(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert),
-      onSelected: (String newInterval) {
-        _chartBloc.add(ChangeInterval(newInterval));
-      },
-      itemBuilder: (BuildContext context) {
-        return ChartBloc.intervals.map((String interval) {
-          return PopupMenuItem<String>(
-            value: interval,
-            child: Text(interval),
+  AxisTitles _leftTitles() {
+    return AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        getTitlesWidget: (value, meta) {
+          return Text(
+            value.toStringAsFixed(2),
+            style: const TextStyle(color: Colors.black, fontSize: 10),
           );
-        }).toList();
-      },
+        },
+      ),
     );
-  }
-
-  void _showIntervalPicker(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Select Interval'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: ChartBloc.intervals
-                .map((interval) => ListTile(
-                      title: Text(interval),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        _chartBloc.add(ChangeInterval(interval));
-                      },
-                    ))
-                .toList(),
-          ),
-        );
-      },
-    );
-  }
-
-  List<Widget> _buildOrderMarkers(BuildContext context, ChartLoaded state) {
-    return widget.trades.map((trade) {
-      final index = state.candles
-          .indexWhere((candle) => candle.date.isAfter(trade.timestamp));
-      if (index == -1) return const SizedBox.shrink();
-
-      final x = index / state.candles.length;
-      final y = (trade.price - state.candles[index].low) /
-          (state.candles[index].high - state.candles[index].low);
-
-      return Positioned(
-        left: x * MediaQuery.of(context).size.width,
-        top: y * MediaQuery.of(context).size.height,
-        child: Icon(
-          trade.type == CoreTradeType.buy
-              ? Icons.arrow_upward
-              : Icons.arrow_downward,
-          color: trade.type == CoreTradeType.buy ? Colors.green : Colors.red,
-          size: 16,
-        ),
-      );
-    }).toList();
   }
 }

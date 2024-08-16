@@ -25,6 +25,8 @@ class ApiService {
     }
   }
 
+  
+
   Stream<Map<String, dynamic>> getTickerStream(String symbol) {
     final wsUrl =
         'wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@ticker';
@@ -183,7 +185,7 @@ class ApiService {
     return await get('/api/v3/exchangeInfo', requiresAuth: false);
   }
 
-  Future<List<List<dynamic>>> getKlines({
+Future<List<List<dynamic>>> getKlines({
     required String symbol,
     required String interval,
     int? limit,
@@ -209,11 +211,6 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> get24hrTickerPriceChange(String symbol) async {
-    return await get('/api/v3/ticker/24hr',
-        queryParams: {'symbol': symbol}, requiresAuth: false);
-  }
-
   Stream<Map<String, dynamic>> getKlineStream(String symbol, String interval) {
     final wsUrl =
         'wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_$interval';
@@ -223,6 +220,11 @@ class ApiService {
       return jsonDecode(event);
     });
   }
+  Future<Map<String, dynamic>> get24hrTickerPriceChange(String symbol) async {
+    return await get('/api/v3/ticker/24hr',
+        queryParams: {'symbol': symbol}, requiresAuth: false);
+  }
+
 
   Future<double> getCurrentPrice(String symbol) async {
     try {

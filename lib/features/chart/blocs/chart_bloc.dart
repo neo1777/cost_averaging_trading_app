@@ -111,7 +111,22 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       limit: 100,
     );
     return klines
-        .map((kline) => Candle.fromJson(kline))
+        .map((kline) {
+          try {
+            return Candle(
+              date: DateTime.fromMillisecondsSinceEpoch(kline[0]),
+              high: double.parse(kline[2]),
+              low: double.parse(kline[3]),
+              open: double.parse(kline[1]),
+              close: double.parse(kline[4]),
+              volume: double.parse(kline[5]),
+            );
+          } catch (e) {
+            return null;
+          }
+        })
+        .where((candle) => candle != null)
+        .cast<Candle>()
         .toList()
         .reversed
         .toList();

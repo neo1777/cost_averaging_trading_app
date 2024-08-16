@@ -1,3 +1,6 @@
+import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/recent_trades_widget.dart';
+import 'package:cost_averaging_trading_app/core/widgets/custom_candlestick_chart.dart';
+import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
@@ -5,9 +8,6 @@ import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_st
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/portfolio_overview.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/performance_chart.dart';
-import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/recent_trades_widget.dart';
-import 'package:cost_averaging_trading_app/core/widgets/custom_candlestick_chart.dart';
-import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});

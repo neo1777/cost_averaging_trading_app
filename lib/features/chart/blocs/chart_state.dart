@@ -1,5 +1,3 @@
-// lib/features/chart/blocs/chart_state.dart
-
 import 'package:equatable/equatable.dart';
 import 'package:candlesticks/candlesticks.dart';
 
