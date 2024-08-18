@@ -1,3 +1,5 @@
+import 'package:cost_averaging_trading_app/candlestick/candlesticks.dart';
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_bloc.dart';
@@ -43,6 +45,8 @@ class StrategyPage extends StatelessWidget {
         const SizedBox(height: 16),
         if (state.status == StrategyStateStatus.active)
           _buildStrategyMonitor(state),
+        const SizedBox(height: 16),
+        _buildCandlestickChart(state),
       ];
     } else if (state is BacktestCompleted) {
       return [BacktestResultView(result: state.result)];
@@ -52,6 +56,41 @@ class StrategyPage extends StatelessWidget {
       return [Center(child: Text('Strategy Error: ${state.message}'))];
     }
     return [const Center(child: Text('Unknown state'))];
+  }
+
+  Widget _buildCandlestickChart(StrategyLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Market Chart',
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 400,
+              child: Candlesticks(
+                candles: state.chartData
+                    .map((data) => Candle(
+                          date: data['date'],
+                          high: data['high'],
+                          low: data['low'],
+                          open: data['open'],
+                          close: data['close'],
+                          volume: data['volume'],
+                        ))
+                    .toList(),
+                onLoadMoreCandles: () async {
+                  // Implementa la logica per caricare più candele
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildStrategyStatus(BuildContext context, StrategyLoaded state) {

@@ -13,3 +13,11 @@ class ChangeTradesPerPage extends DashboardEvent {
 
   ChangeTradesPerPage(this.tradesPerPage);
 }
+
+class ChangeSymbol extends DashboardEvent {
+  final String symbol;
+
+  ChangeSymbol(this.symbol);
+
+  List<Object> get props => [symbol];
+}

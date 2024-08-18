@@ -1,5 +1,5 @@
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:equatable/equatable.dart';
-import 'package:candlesticks/candlesticks.dart';
 
 abstract class ChartState extends Equatable {
   const ChartState();

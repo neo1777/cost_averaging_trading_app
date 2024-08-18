@@ -206,8 +206,6 @@ class BacktestingService {
     final klines = await apiService.getKlines(
       symbol: symbol,
       interval: '1d',
-      startTime: startDate.millisecondsSinceEpoch,
-      endTime: endDate.millisecondsSinceEpoch,
     );
 
     return klines

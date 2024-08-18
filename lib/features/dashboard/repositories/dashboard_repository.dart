@@ -1,3 +1,4 @@
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
@@ -12,6 +13,26 @@ class DashboardRepository {
     required this.apiService,
     required this.databaseService,
   });
+
+  Future<List<Candle>> getMarketData(String symbol) async {
+    try {
+      return await apiService.getKlineData(symbol, '1h');
+    } catch (e) {
+      // In caso di errore, restituisci dati di esempio
+      return List.generate(100, (index) {
+        final date = DateTime.now().subtract(Duration(hours: 100 - index));
+        final basePrice = 30000.0 + (index * 10);
+        return Candle(
+          date: date,
+          open: basePrice,
+          high: basePrice + 50,
+          low: basePrice - 50,
+          close: basePrice + 20,
+          volume: 1000.0 + (index * 10),
+        );
+      });
+    }
+  }
 
   Future<Portfolio> getPortfolio() async {
     try {

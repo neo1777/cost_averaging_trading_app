@@ -31,6 +31,2887 @@ void main() async {
 
 ```
 
+./lib/candlestick/widgets/mobile_chart.dart:
+```
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+
+import '.././constant/view_constants.dart';
+import '.././models/main_window_indicator.dart';
+import '.././utils/helper_functions.dart';
+import '.././widgets/candle_stick_widget.dart';
+import '.././widgets/mainwindow_indicator_widget.dart';
+import '.././widgets/price_column.dart';
+import '.././widgets/time_row.dart';
+import '.././widgets/top_panel.dart';
+import '.././widgets/volume_widget.dart';
+import '../candlesticks.dart';
+import '../models/candle.dart';
+import '../models/candle_sticks_style.dart';
+import 'dash_line.dart';
+
+/// This widget manages gestures
+/// Calculates the highest and lowest price of visible candles.
+/// Updates right-hand side numbers.
+/// And pass values down to [CandleStickWidget].
+class MobileChart extends StatefulWidget {
+  /// onScaleUpdate callback
+  /// called when user scales chart using buttons or scale gesture
+  final Function onScaleUpdate;
+
+  /// onHorizontalDragUpdate
+  /// callback calls when user scrolls horizontally along the chart
+  final Function onHorizontalDragUpdate;
+
+  /// candleWidth controls the width of the single candles.
+  /// range: [2...10]
+  final double candleWidth;
+
+  /// list of all candles to display in chart
+  final List<Candle> candles;
+
+  /// index of the newest candle to be displayed
+  /// changes when user scrolls along the chart
+  final int index;
+
+  /// holds main window indicators data and high and low prices.
+  final MainWindowDataContainer mainWindowDataContainer;
+
+  /// How chart price range will be adjusted when moving chart
+  final ChartAdjust chartAdjust;
+
+  final CandleSticksStyle style;
+
+  final void Function(double) onPanDown;
+  final void Function() onPanEnd;
+
+  final void Function(String)? onRemoveIndicator;
+
+  final Function() onReachEnd;
+
+  const MobileChart({super.key, 
+    required this.style,
+    required this.onScaleUpdate,
+    required this.onHorizontalDragUpdate,
+    required this.candleWidth,
+    required this.candles,
+    required this.index,
+    required this.chartAdjust,
+    required this.onPanDown,
+    required this.onPanEnd,
+    required this.onReachEnd,
+    required this.mainWindowDataContainer,
+    required this.onRemoveIndicator,
+  });
+
+  @override
+  State<MobileChart> createState() => _MobileChartState();
+}
+
+class _MobileChartState extends State<MobileChart> {
+  double? longPressX;
+  double? longPressY;
+  bool showIndicatorNames = false;
+  double? manualScaleHigh;
+  double? manualScaleLow;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // determine charts width and height
+        final double maxWidth = constraints.maxWidth - PRICE_BAR_WIDTH;
+        final double maxHeight = constraints.maxHeight - DATE_BAR_HEIGHT;
+
+        // visible candles start and end indexes
+        final int candlesStartIndex = max(widget.index, 0);
+        final int candlesEndIndex = min(
+            maxWidth ~/ widget.candleWidth + widget.index,
+            widget.candles.length - 1);
+
+        if (candlesEndIndex == widget.candles.length - 1) {
+          Future(() {
+            widget.onReachEnd();
+          });
+        }
+
+        List<Candle> inRangeCandles = widget.candles
+            .getRange(candlesStartIndex, candlesEndIndex + 1)
+            .toList();
+
+        double candlesHighPrice = 0;
+        double candlesLowPrice = 0;
+        if (manualScaleHigh != null) {
+          candlesHighPrice = manualScaleHigh!;
+          candlesLowPrice = manualScaleLow!;
+        } else if (widget.chartAdjust == ChartAdjust.visibleRange) {
+          candlesHighPrice = widget.mainWindowDataContainer.highs
+              .getRange(candlesStartIndex, candlesEndIndex + 1)
+              .reduce(max);
+          candlesLowPrice = widget.mainWindowDataContainer.lows
+              .getRange(candlesStartIndex, candlesEndIndex + 1)
+              .reduce(min);
+        } else if (widget.chartAdjust == ChartAdjust.fullRange) {
+          candlesHighPrice = widget.mainWindowDataContainer.highs.reduce(max);
+          candlesLowPrice = widget.mainWindowDataContainer.lows.reduce(min);
+        }
+
+        if (candlesHighPrice == candlesLowPrice) {
+          candlesHighPrice += 10;
+          candlesLowPrice -= 10;
+        }
+
+        // calculate priceScale
+        double chartHeight = maxHeight * 0.75 - 2 * MAIN_CHART_VERTICAL_PADDING;
+
+        // calculate highest volume
+        double volumeHigh = inRangeCandles.map((e) => e.volume).reduce(max);
+
+        if (longPressX != null && longPressY != null) {
+          longPressX = max(longPressX!, 0);
+          longPressX = min(longPressX!, maxWidth);
+          longPressY = max(longPressY!, 0);
+          longPressY = min(longPressY!, maxHeight);
+        }
+
+        return TweenAnimationBuilder(
+          tween: Tween(begin: candlesHighPrice, end: candlesHighPrice),
+          duration: Duration(milliseconds: manualScaleHigh == null ? 300 : 0),
+          builder: (context, double high, _) {
+            return TweenAnimationBuilder(
+              tween: Tween(begin: candlesLowPrice, end: candlesLowPrice),
+              duration:
+                  Duration(milliseconds: manualScaleHigh == null ? 300 : 0),
+              builder: (context, double low, _) {
+                final currentCandle = longPressX == null
+                    ? null
+                    : widget.candles[min(
+                        max(
+                            (maxWidth - longPressX!) ~/ widget.candleWidth +
+                                widget.index,
+                            0),
+                        widget.candles.length - 1)];
+                return Container(
+                  color: widget.style.background,
+                  child: Stack(
+                    children: [
+                      TimeRow(
+                        style: widget.style,
+                        indicatorX: longPressX,
+                        candles: widget.candles,
+                        candleWidth: widget.candleWidth,
+                        indicatorTime: currentCandle?.date,
+                        index: widget.index,
+                      ),
+                      Column(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Stack(
+                              children: [
+                                PriceColumn(
+                                  style: widget.style,
+                                  low: candlesLowPrice,
+                                  high: candlesHighPrice,
+                                  width: constraints.maxWidth,
+                                  chartHeight: chartHeight,
+                                  lastCandle: widget.candles[
+                                      widget.index < 0 ? 0 : widget.index],
+                                  onScale: (delta) {
+                                    if (manualScaleHigh == null) {
+                                      manualScaleHigh = candlesHighPrice;
+                                      manualScaleLow = candlesLowPrice;
+                                    }
+                                    setState(() {
+                                      double deltaPrice = delta /
+                                          chartHeight *
+                                          (manualScaleHigh! - manualScaleLow!);
+                                      manualScaleHigh =
+                                          manualScaleHigh! + deltaPrice;
+                                      manualScaleLow =
+                                          manualScaleLow! - deltaPrice;
+                                    });
+                                  },
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            right: BorderSide(
+                                              color: widget.style.borderColor,
+                                              width: 1,
+                                            ),
+                                          ),
+                                        ),
+                                        child: AnimatedPadding(
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical:
+                                                  MAIN_CHART_VERTICAL_PADDING),
+                                          child: RepaintBoundary(
+                                            child: Stack(
+                                              children: [
+                                                MainWindowIndicatorWidget(
+                                                  indicatorDatas: widget
+                                                      .mainWindowDataContainer
+                                                      .indicatorComponentData,
+                                                  index: widget.index,
+                                                  candleWidth:
+                                                      widget.candleWidth,
+                                                  low: low,
+                                                  high: high,
+                                                ),
+                                                CandleStickWidget(
+                                                  candles: widget.candles,
+                                                  candleWidth:
+                                                      widget.candleWidth,
+                                                  index: widget.index,
+                                                  high: high,
+                                                  low: low,
+                                                  bearColor:
+                                                      widget.style.primaryBear,
+                                                  bullColor:
+                                                      widget.style.primaryBull,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      width: PRICE_BAR_WIDTH,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        right: BorderSide(
+                                          color: widget.style.borderColor,
+                                          width: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 10.0),
+                                      child: VolumeWidget(
+                                        candles: widget.candles,
+                                        barWidth: widget.candleWidth,
+                                        index: widget.index,
+                                        high:
+                                            HelperFunctions.getRoof(volumeHigh),
+                                        bearColor: widget.style.secondaryBear,
+                                        bullColor: widget.style.secondaryBull,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: PRICE_BAR_WIDTH,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        height: DATE_BAR_HEIGHT,
+                                        child: Center(
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                "-${HelperFunctions.addMetricPrefix(HelperFunctions.getRoof(volumeHigh))}",
+                                                style: TextStyle(
+                                                  color:
+                                                      widget.style.borderColor,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(
+                            height: DATE_BAR_HEIGHT,
+                          ),
+                        ],
+                      ),
+                      longPressY != null
+                          ? Positioned(
+                              top: longPressY! - 10,
+                              child: Row(
+                                children: [
+                                  DashLine(
+                                    length: maxWidth,
+                                    color: widget.style.borderColor,
+                                    direction: Axis.horizontal,
+                                    thickness: 0.5,
+                                  ),
+                                  Container(
+                                    color: widget
+                                        .style.hoverIndicatorBackgroundColor,
+                                    width: PRICE_BAR_WIDTH,
+                                    height: 20,
+                                    child: Center(
+                                      child: Text(
+                                        longPressY! < maxHeight * 0.75
+                                            ? HelperFunctions.priceToString(
+                                                high -
+                                                    (longPressY! - 20) /
+                                                        (maxHeight * 0.75 -
+                                                            40) *
+                                                        (high - low))
+                                            : HelperFunctions.addMetricPrefix(
+                                                HelperFunctions.getRoof(
+                                                        volumeHigh) *
+                                                    (1 -
+                                                        (longPressY! -
+                                                                maxHeight *
+                                                                    0.75 -
+                                                                10) /
+                                                            (maxHeight * 0.25 -
+                                                                10))),
+                                        style: TextStyle(
+                                          color:
+                                              widget.style.secondaryTextColor,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Container(),
+                      longPressX != null
+                          ? Positioned(
+                              right: (maxWidth - longPressX!) ~/
+                                      widget.candleWidth *
+                                      widget.candleWidth +
+                                  PRICE_BAR_WIDTH,
+                              child: Container(
+                                width: widget.candleWidth,
+                                height: maxHeight,
+                                color: widget.style.mobileCandleHoverColor,
+                              ),
+                            )
+                          : Container(),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 50, bottom: 20),
+                        child: GestureDetector(
+                          onLongPressEnd: (_) {
+                            setState(() {
+                              longPressX = null;
+                              longPressY = null;
+                            });
+                          },
+                          onScaleEnd: (_) {
+                            widget.onPanEnd();
+                          },
+                          onScaleUpdate: (details) {
+                            if (details.scale == 1) {
+                              widget.onHorizontalDragUpdate(
+                                  details.focalPoint.dx);
+                              setState(() {
+                                if (manualScaleHigh != null) {
+                                  double deltaPrice =
+                                      details.focalPointDelta.dy /
+                                          chartHeight *
+                                          (manualScaleHigh! - manualScaleLow!);
+                                  manualScaleHigh =
+                                      manualScaleHigh! + deltaPrice;
+                                  manualScaleLow = manualScaleLow! + deltaPrice;
+                                }
+                              });
+                            }
+                            widget.onScaleUpdate(details.scale);
+                          },
+                          onScaleStart: (details) {
+                            widget.onPanDown(details.localFocalPoint.dx);
+                          },
+                          onLongPressStart: (LongPressStartDetails details) {
+                            setState(() {
+                              longPressX = details.localPosition.dx;
+                              longPressY = details.localPosition.dy;
+                            });
+                          },
+                          behavior: HitTestBehavior.translucent,
+                          onLongPressMoveUpdate:
+                              (LongPressMoveUpdateDetails details) {
+                            setState(() {
+                              longPressX = details.localPosition.dx;
+                              longPressY = details.localPosition.dy;
+                            });
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 4, horizontal: 12),
+                        child: TopPanel(
+                          style: widget.style,
+                          onRemoveIndicator: widget.onRemoveIndicator,
+                          currentCandle: currentCandle,
+                          indicators: widget.mainWindowDataContainer.indicators,
+                          toggleIndicatorVisibility: (indicatorName) {
+                            setState(() {
+                              widget.mainWindowDataContainer
+                                  .toggleIndicatorVisibility(indicatorName);
+                            });
+                          },
+                          unvisibleIndicators: widget
+                              .mainWindowDataContainer.unvisibleIndicators,
+                        ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        width: PRICE_BAR_WIDTH,
+                        height: 20,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            backgroundColor:
+                                widget.style.hoverIndicatorBackgroundColor,
+                          ),
+                          onPressed: manualScaleHigh == null
+                              ? null
+                              : () {
+                                  setState(() {
+                                    manualScaleHigh = null;
+                                    manualScaleLow = null;
+                                  });
+                                },
+                          child: const Text("Auto"),
+                        ),
+                      )
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+```
+
+./lib/candlestick/widgets/volume_widget.dart:
+```
+import 'package:flutter/material.dart';
+
+import '.././models/candle.dart';
+
+class VolumeRenderObject extends RenderBox {
+  late List<Candle> _candles;
+  late int _index;
+  late double _barWidth;
+  late double _high;
+  late Color _bearColor;
+  late Color _bullColor;
+
+  VolumeRenderObject(
+    List<Candle> candles,
+    int index,
+    double barWidth,
+    double high,
+    Color bearColor,
+    Color bullColor,
+  ) {
+    _candles = candles;
+    _index = index;
+    _barWidth = barWidth;
+    _high = high;
+    _bearColor = bearColor;
+    _bullColor = bullColor;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    double range = (_high) / size.height;
+    for (int i = 0; (i + 1) * _barWidth < size.width; i++) {
+      if (i + _index >= _candles.length || i + _index < 0) continue;
+      var candle = _candles[i + _index];
+      paintBar(context, offset, i, candle, range);
+    }
+    context.canvas.save();
+    context.canvas.restore();
+  }
+
+  /// draws a single candle
+  void paintBar(PaintingContext context, Offset offset, int index,
+      Candle candle, double range) {
+    Color color = candle.isBull ? _bullColor : _bearColor;
+
+    double x = size.width + offset.dx - (index + 0.5) * _barWidth;
+
+    context.canvas.drawLine(
+        Offset(x, offset.dy + (_high - candle.volume) / range),
+        Offset(x, offset.dy + size.height),
+        Paint()
+          ..color = color
+          ..strokeWidth = _barWidth - 1);
+  }
+
+  /// set size as large as possible
+  @override
+  void performLayout() {
+    size = Size(constraints.maxWidth, constraints.maxHeight);
+  }
+}
+
+class VolumeWidget extends LeafRenderObjectWidget {
+  final List<Candle> candles;
+  final int index;
+  final double barWidth;
+  final double high;
+  final Color bullColor;
+  final Color bearColor;
+
+  const VolumeWidget({super.key, 
+    required this.candles,
+    required this.index,
+    required this.barWidth,
+    required this.high,
+    required this.bearColor,
+    required this.bullColor,
+  });
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return VolumeRenderObject(
+      candles,
+      index,
+      barWidth,
+      high,
+      bearColor,
+      bullColor,
+    );
+  }
+
+  @override
+  void updateRenderObject(
+      BuildContext context, covariant RenderObject renderObject) {
+    VolumeRenderObject candlestickRenderObject =
+        renderObject as VolumeRenderObject;
+    candlestickRenderObject._candles = candles;
+    candlestickRenderObject._index = index;
+    candlestickRenderObject._barWidth = barWidth;
+    candlestickRenderObject._high = high;
+    candlestickRenderObject._bearColor = bearColor;
+    candlestickRenderObject._bullColor = bullColor;
+    candlestickRenderObject.markNeedsPaint();
+    super.updateRenderObject(context, renderObject);
+  }
+}
+
+```
+
+./lib/candlestick/widgets/time_row.dart:
+```
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '.././constant/view_constants.dart';
+import '.././models/candle.dart';
+import '.././models/candle_sticks_style.dart';
+
+class TimeRow extends StatefulWidget {
+  final List<Candle> candles;
+  final double candleWidth;
+  final double? indicatorX;
+  final DateTime? indicatorTime;
+  final int index;
+  final CandleSticksStyle style;
+
+  const TimeRow({
+    super.key,
+    required this.candles,
+    required this.candleWidth,
+    this.indicatorX,
+    required this.indicatorTime,
+    required this.index,
+    required this.style,
+  });
+
+  @override
+  State<TimeRow> createState() => _TimeRowState();
+}
+
+class _TimeRowState extends State<TimeRow> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  Widget build(BuildContext context) {
+    int step = _stepCalculator();
+    final dif =
+        widget.candles[0].date.difference(widget.candles[1].date) * step;
+    return Padding(
+      padding: const EdgeInsets.only(right: PRICE_BAR_WIDTH + 1.0),
+      child: Stack(
+        children: [
+          ListView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: math.max(widget.candles.length, 1000),
+            scrollDirection: Axis.horizontal,
+            itemExtent: step * widget.candleWidth,
+            controller: _scrollController,
+            reverse: true,
+            itemBuilder: (context, index) {
+              DateTime time = _timeCalculator(step, index, dif);
+              return Column(
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  Expanded(
+                    child: Container(
+                      width: 0.05,
+                      color: widget.style.borderColor,
+                    ),
+                  ),
+                  dif.compareTo(const Duration(days: 1)) > 0
+                      ? _monthDayText(time, widget.style.primaryTextColor)
+                      : _hourMinuteText(time, widget.style.primaryTextColor),
+                ],
+              );
+            },
+          ),
+          widget.indicatorX == null
+              ? Container()
+              : Positioned(
+                  bottom: 0,
+                  left: math.max(widget.indicatorX! - 55, 0),
+                  child: Container(
+                    color: widget.style.hoverIndicatorBackgroundColor,
+                    width: 110,
+                    height: 20,
+                    child: Center(
+                      child: Text(
+                        dateFormatter(widget.indicatorTime!),
+                        style: TextStyle(
+                          color: widget.style.secondaryTextColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+
+  String dateFormatter(DateTime date) {
+    return "${date.year}-${numberFormat(date.month)}-${numberFormat(date.day)} ${numberFormat(date.hour)}:${numberFormat(date.minute)}";
+  }
+
+  @override
+  void didUpdateWidget(TimeRow oldWidget) {
+    if (oldWidget.index != widget.index ||
+        oldWidget.candleWidth != widget.candleWidth) {
+      _scrollController.jumpTo((widget.index + 10) * widget.candleWidth);
+    }
+    super.didUpdateWidget(oldWidget);
+  }
+
+  /// Fomats number as 2 digit integer
+  String numberFormat(int value) {
+    return "${value < 10 ? 0 : ""}$value";
+  }
+
+  /// Hour/minute text widget
+  Text _hourMinuteText(DateTime time, Color color) {
+    return Text(
+      "${numberFormat(time.hour)}:${numberFormat(time.minute)}",
+      style: TextStyle(
+        color: color,
+        fontSize: 12,
+      ),
+    );
+  }
+
+  /// Day/month text widget
+  Text _monthDayText(DateTime time, Color color) {
+    return Text(
+      "${numberFormat(time.month)}/${numberFormat(time.day)}",
+      style: TextStyle(
+        color: color,
+        fontSize: 12,
+      ),
+    );
+  }
+
+  /// Calculates number of candles between two time indicator
+  int _stepCalculator() {
+    if (widget.candleWidth < 3) {
+      return 31;
+    } else if (widget.candleWidth < 5) {
+      return 19;
+    } else if (widget.candleWidth < 7) {
+      return 13;
+    } else {
+      return 9;
+    }
+  }
+
+  /// Calculates [DateTime] of a given candle index
+  DateTime _timeCalculator(int step, int index, Duration dif) {
+    int candleNumber = (step + 1) ~/ 2 - 10 + index * step + -1;
+    DateTime? time;
+    if (candleNumber < 0) {
+      time = widget.candles[0].date.add(Duration(
+          milliseconds: dif.inMilliseconds ~/ -1 * step * candleNumber));
+    } else if (candleNumber < widget.candles.length) {
+      time = widget.candles[candleNumber].date;
+    } else {
+      time = widget.candles[0].date.subtract(
+          Duration(milliseconds: dif.inMilliseconds ~/ step * candleNumber));
+    }
+    return time;
+  }
+}
+
+```
+
+./lib/candlestick/widgets/dash_line.dart:
+```
+import 'package:flutter/material.dart';
+
+class DashLine extends StatelessWidget {
+  final Axis direction;
+  final double thickness;
+  final double length;
+  final Color color;
+
+  const DashLine({
+    super.key,
+    required this.direction,
+    required this.thickness,
+    required this.length,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    bool isVertical = direction == Axis.vertical;
+    return SizedBox(
+      height: isVertical ? length : thickness,
+      width: isVertical ? thickness : length,
+      child: ListView.builder(
+          scrollDirection: direction,
+          itemCount: length ~/ 2,
+          itemBuilder: (context, index) {
+            if (index % 2 == 0) {
+              return SizedBox(
+                  width: isVertical ? null : 2, height: isVertical ? 2 : null);
+            }
+            return Container(
+              width: isVertical ? thickness : 2,
+              height: isVertical ? 2 : thickness,
+              color: color,
+            );
+          }),
+    );
+  }
+}
+
+```
+
+./lib/candlestick/widgets/candle_stick_widget.dart:
+```
+import 'package:flutter/material.dart';
+
+import '.././models/candle.dart';
+
+class CandleStickRenderObject extends RenderBox {
+  late List<Candle> _candles;
+  late int _index;
+  late double _candleWidth;
+  late double _low;
+  late double _high;
+  late double _close;
+  late Color _bullColor;
+  late Color _bearColor;
+
+  CandleStickRenderObject(
+    List<Candle> candles,
+    int index,
+    double candleWidth,
+    double low,
+    double high,
+    Color bullColor,
+    Color bearColor,
+  ) {
+    _candles = candles;
+    _index = index;
+    _candleWidth = candleWidth;
+    _low = low;
+    _high = high;
+    _bearColor = bearColor;
+    _bullColor = bullColor;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    double range = (_high - _low) / size.height;
+    for (int i = 0; (i + 1) * _candleWidth < size.width; i++) {
+      if (i + _index >= _candles.length || i + _index < 0) continue;
+      var candle = _candles[i + _index];
+      paintCandle(context, offset, i, candle, range);
+    }
+    _close = _candles[0].close;
+    context.canvas.save();
+    context.canvas.restore();
+  }
+
+  /// draws a single candle
+  void paintCandle(PaintingContext context, Offset offset, int index,
+      Candle candle, double range) {
+    Color color = candle.isBull ? _bullColor : _bearColor;
+
+    Paint paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    double x = size.width + offset.dx - (index + 0.5) * _candleWidth;
+
+    context.canvas.drawLine(
+      Offset(x, offset.dy + (_high - candle.high) / range),
+      Offset(x, offset.dy + (_high - candle.low) / range),
+      paint,
+    );
+
+    final double openCandleY = offset.dy + (_high - candle.open) / range;
+    final double closeCandleY = offset.dy + (_high - candle.close) / range;
+
+    if ((openCandleY - closeCandleY).abs() > 1) {
+      context.canvas.drawLine(
+        Offset(x, openCandleY),
+        Offset(x, closeCandleY),
+        paint..strokeWidth = _candleWidth * 0.8,
+      );
+    } else {
+      // if the candle body is too small
+      final double mid = (closeCandleY + openCandleY) / 2;
+      context.canvas.drawLine(
+        Offset(x, mid - 0.5),
+        Offset(x, mid + 0.5),
+        paint..strokeWidth = _candleWidth * 0.8,
+      );
+    }
+  }
+
+  /// set size as large as possible
+  @override
+  void performLayout() {
+    size = Size(constraints.maxWidth, constraints.maxHeight);
+  }
+}
+
+class CandleStickWidget extends LeafRenderObjectWidget {
+  final List<Candle> candles;
+  final int index;
+  final double candleWidth;
+  final double high;
+  final double low;
+  final Color bullColor;
+  final Color bearColor;
+
+  const CandleStickWidget({super.key, 
+    required this.candles,
+    required this.index,
+    required this.candleWidth,
+    required this.low,
+    required this.high,
+    required this.bearColor,
+    required this.bullColor,
+  });
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return CandleStickRenderObject(
+      candles,
+      index,
+      candleWidth,
+      low,
+      high,
+      bullColor,
+      bearColor,
+    );
+  }
+
+  @override
+  void updateRenderObject(
+      BuildContext context, covariant RenderObject renderObject) {
+    CandleStickRenderObject candlestickRenderObject =
+        renderObject as CandleStickRenderObject;
+
+    if (index <= 0 && candlestickRenderObject._close != candles[0].close) {
+      candlestickRenderObject._candles = candles;
+      candlestickRenderObject._index = index;
+      candlestickRenderObject._candleWidth = candleWidth;
+      candlestickRenderObject._high = high;
+      candlestickRenderObject._low = low;
+      candlestickRenderObject._bullColor = bullColor;
+      candlestickRenderObject._bearColor = bearColor;
+      candlestickRenderObject.markNeedsPaint();
+    } else if (candlestickRenderObject._index != index ||
+        candlestickRenderObject._candleWidth != candleWidth ||
+        candlestickRenderObject._high != high ||
+        candlestickRenderObject._low != low) {
+      candlestickRenderObject._candles = candles;
+      candlestickRenderObject._index = index;
+      candlestickRenderObject._candleWidth = candleWidth;
+      candlestickRenderObject._high = high;
+      candlestickRenderObject._low = low;
+      candlestickRenderObject._bullColor = bullColor;
+      candlestickRenderObject._bearColor = bearColor;
+      candlestickRenderObject.markNeedsPaint();
+    }
+    super.updateRenderObject(context, renderObject);
+  }
+}
+
+```
+
+./lib/candlestick/widgets/price_column.dart:
+```
+import 'package:flutter/material.dart';
+
+import '.././constant/view_constants.dart';
+import '.././models/candle.dart';
+import '.././models/candle_sticks_style.dart';
+import '.././utils/helper_functions.dart';
+
+class PriceColumn extends StatefulWidget {
+  final double low;
+
+  final double high;
+  final double width;
+  final double chartHeight;
+  final Candle lastCandle;
+  final void Function(double) onScale;
+  final CandleSticksStyle style;
+  const PriceColumn({
+    super.key,
+    required this.low,
+    required this.high,
+    required this.width,
+    required this.chartHeight,
+    required this.lastCandle,
+    required this.onScale,
+    required this.style,
+  });
+
+  @override
+  State<PriceColumn> createState() => _PriceColumnState();
+}
+
+class _PriceColumnState extends State<PriceColumn> {
+  ScrollController scrollController = ScrollController();
+
+  @override
+  Widget build(BuildContext context) {
+    final double priceScale = HelperFunctions.calculatePriceScale(
+        widget.chartHeight, widget.high, widget.low);
+    final double priceTileHeight =
+        widget.chartHeight / ((widget.high - widget.low) / priceScale);
+    final double newHigh = (widget.high ~/ priceScale + 1) * priceScale;
+    final double top = -priceTileHeight / priceScale * (newHigh - widget.high) +
+        MAIN_CHART_VERTICAL_PADDING -
+        priceTileHeight / 2;
+    return GestureDetector(
+      onVerticalDragUpdate: (details) {
+        widget.onScale(details.delta.dy);
+      },
+      child: AbsorbPointer(
+        child: Stack(
+          children: [
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              top: top,
+              height:
+                  widget.chartHeight + 2 * MAIN_CHART_VERTICAL_PADDING - top,
+              width: widget.width,
+              child: ListView(
+                controller: scrollController,
+                children: List<Widget>.generate(20, (i) {
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    height: priceTileHeight,
+                    width: double.infinity,
+                    child: Center(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: widget.width - PRICE_BAR_WIDTH,
+                            height: 0.05,
+                            color: widget.style.borderColor,
+                          ),
+                          Expanded(
+                            child: Text(
+                              HelperFunctions.priceToString(
+                                  newHigh - priceScale * i),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: widget.style.primaryTextColor,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              right: 0,
+              top: calculatePriceIndicatorTopPadding(
+                widget.chartHeight,
+                widget.low,
+                widget.high,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    color: widget.lastCandle.isBull
+                        ? widget.style.primaryBull
+                        : widget.style.primaryBear,
+                    width: PRICE_BAR_WIDTH,
+                    height: PRICE_INDICATOR_HEIGHT,
+                    child: Center(
+                      child: Text(
+                        HelperFunctions.priceToString(widget.lastCandle.close),
+                        style: TextStyle(
+                          color: widget.style.secondaryTextColor,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double calculatePriceIndicatorTopPadding(
+      double chartHeight, double low, double high) {
+    return chartHeight +
+        10 -
+        (widget.lastCandle.close - low) / (high - low) * chartHeight -
+        MAIN_CHART_VERTICAL_PADDING;
+  }
+}
+
+```
+
+./lib/candlestick/widgets/candle_info_text.dart:
+```
+import 'package:flutter/material.dart';
+
+import '.././models/candle.dart';
+import '.././utils/helper_functions.dart';
+
+class CandleInfoText extends StatelessWidget {
+  final Candle candle;
+
+  final Color bullColor;
+  final Color bearColor;
+  final TextStyle defaultStyle;
+  const CandleInfoText({
+    super.key,
+    required this.candle,
+    required this.bullColor,
+    required this.bearColor,
+    required this.defaultStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      text: TextSpan(
+        text: dateFormatter(candle.date),
+        style: defaultStyle,
+        children: <TextSpan>[
+          const TextSpan(text: " O:"),
+          TextSpan(
+            text: HelperFunctions.priceToString(candle.open),
+            style: TextStyle(
+              color: candle.isBull ? bullColor : bearColor,
+            ),
+          ),
+          const TextSpan(text: " H:"),
+          TextSpan(
+            text: HelperFunctions.priceToString(candle.high),
+            style: TextStyle(
+              color: candle.isBull ? bullColor : bearColor,
+            ),
+          ),
+          const TextSpan(text: " L:"),
+          TextSpan(
+            text: HelperFunctions.priceToString(candle.low),
+            style: TextStyle(
+              color: candle.isBull ? bullColor : bearColor,
+            ),
+          ),
+          const TextSpan(text: " C:"),
+          TextSpan(
+            text: HelperFunctions.priceToString(candle.close),
+            style: TextStyle(
+              color: candle.isBull ? bullColor : bearColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String dateFormatter(DateTime date) {
+    return "${date.year}-${numberFormat(date.month)}-${numberFormat(date.day)} ${numberFormat(date.hour)}:${numberFormat(date.minute)}";
+  }
+
+  String numberFormat(int value) {
+    return "${value < 10 ? 0 : ""}$value";
+  }
+}
+
+```
+
+./lib/candlestick/widgets/toolbar.dart:
+```
+import 'package:flutter/material.dart';
+
+class ToolBar extends StatelessWidget {
+  const ToolBar({super.key, required this.children, required this.color});
+
+  final List<Widget> children;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: color,
+      child: Padding(
+        padding: const EdgeInsets.all(2.0),
+        child: Row(
+          children: children,
+        ),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/candlestick/widgets/toolbar_action.dart:
+```
+import 'package:flutter/material.dart';
+
+/// Top toolbar button widget.
+class ToolBarAction extends StatelessWidget {
+  final void Function() onPressed;
+  final Widget child;
+  final double width;
+  final Color? color;
+
+  const ToolBarAction({
+    super.key,
+    required this.child,
+    required this.onPressed,
+    this.width = 30,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: 30,
+      child: RawMaterialButton(
+        elevation: 0,
+        fillColor: color,
+        onPressed: onPressed,
+        child: Center(child: child),
+      ),
+    );
+  }
+}
+
+```
+
+./lib/candlestick/widgets/top_panel.dart:
+```
+import 'package:flutter/material.dart';
+
+import '.././models/candle.dart';
+import '.././models/candle_sticks_style.dart';
+import '.././models/indicator.dart';
+import '.././widgets/candle_info_text.dart';
+
+class TopPanel extends StatefulWidget {
+  final Candle? currentCandle;
+
+  final List<Indicator> indicators;
+  final void Function(String indicatorName) toggleIndicatorVisibility;
+  final List<String> unvisibleIndicators;
+  final void Function(String indicatorName)? onRemoveIndicator;
+  final CandleSticksStyle style;
+  const TopPanel({
+    super.key,
+    required this.currentCandle,
+    required this.indicators,
+    required this.toggleIndicatorVisibility,
+    required this.unvisibleIndicators,
+    required this.onRemoveIndicator,
+    required this.style,
+  });
+
+  @override
+  State<TopPanel> createState() => _TopPanelState();
+}
+
+class _PanelButton extends StatelessWidget {
+  final Widget child;
+
+  final Color borderColor;
+  const _PanelButton({
+    required this.child,
+    required this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      child: Row(
+        children: [
+          Container(
+            height: 25,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: borderColor,
+              ),
+              borderRadius: const BorderRadius.all(
+                Radius.circular(5),
+              ),
+            ),
+            child: Center(child: child),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopPanelState extends State<TopPanel> {
+  bool showIndicatorNames = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTextStyle(
+      style: TextStyle(color: widget.style.primaryTextColor),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 20,
+            child: widget.currentCandle != null
+                ? CandleInfoText(
+                    candle: widget.currentCandle!,
+                    bullColor: widget.style.primaryBull,
+                    bearColor: widget.style.primaryBear,
+                    defaultStyle: TextStyle(
+                        color: widget.style.borderColor, fontSize: 10),
+                  )
+                : Container(),
+          ),
+          showIndicatorNames || widget.indicators.length == 1
+              ? Column(
+                  children: widget.indicators
+                      .map(
+                        (e) => _PanelButton(
+                          borderColor: widget.style.borderColor,
+                          child: Row(
+                            children: [
+                              Text(e.name),
+                              const SizedBox(
+                                width: 10,
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  widget.toggleIndicatorVisibility(e.name);
+                                },
+                                child: widget.unvisibleIndicators
+                                        .contains(e.name)
+                                    ? Icon(
+                                        Icons.visibility_off_outlined,
+                                        size: 16,
+                                        color: widget.style.primaryTextColor,
+                                      )
+                                    : Icon(Icons.visibility_outlined,
+                                        size: 16,
+                                        color: widget.style.primaryTextColor),
+                              ),
+                              const SizedBox(
+                                width: 10,
+                              ),
+                              widget.onRemoveIndicator != null
+                                  ? GestureDetector(
+                                      onTap: () {
+                                        widget.onRemoveIndicator!(e.name);
+                                      },
+                                      child: Icon(Icons.close,
+                                          size: 16,
+                                          color: widget.style.primaryTextColor),
+                                    )
+                                  : Container(),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                )
+              : Container(),
+          widget.indicators.length > 1
+              ? GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      showIndicatorNames = !showIndicatorNames;
+                    });
+                  },
+                  child: _PanelButton(
+                    borderColor: widget.style.borderColor,
+                    child: Row(
+                      children: [
+                        Icon(
+                            showIndicatorNames
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            color: widget.style.primaryTextColor),
+                        Text(widget.indicators.length.toString()),
+                      ],
+                    ),
+                  ),
+                )
+              : Container(),
+        ],
+      ),
+    );
+  }
+}
+
+```
+
+./lib/candlestick/widgets/desktop_chart.dart:
+```
+import 'dart:math';
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+
+import '.././constant/view_constants.dart';
+import '.././models/candle_sticks_style.dart';
+import '.././models/main_window_indicator.dart';
+import '.././utils/helper_functions.dart';
+import '.././widgets/candle_stick_widget.dart';
+import '.././widgets/mainwindow_indicator_widget.dart';
+import '.././widgets/price_column.dart';
+import '.././widgets/time_row.dart';
+import '.././widgets/top_panel.dart';
+import '.././widgets/volume_widget.dart';
+import '../candlesticks.dart';
+import '../models/candle.dart';
+import 'dash_line.dart';
+
+/// This widget manages gestures
+/// Calculates the highest and lowest price of visible candles.
+/// Updates right-hand side numbers.
+/// And pass values down to [CandleStickWidget].
+class DesktopChart extends StatefulWidget {
+  /// onScaleUpdate callback
+  /// called when user scales chart using buttons or scale gesture
+  final Function onScaleUpdate;
+
+  /// onHorizontalDragUpdate
+  /// callback calls when user scrolls horizontally along the chart
+  final Function onHorizontalDragUpdate;
+
+  /// candleWidth controls the width of the single candles.
+  /// range: [2...10]
+  final double candleWidth;
+
+  /// list of all candles to display in chart
+  final List<Candle> candles;
+
+  /// index of the newest candle to be displayed
+  /// changes when user scrolls along the chart
+  final int index;
+
+  /// Will chart resize vertically by visible range
+  /// or by the whole dataset
+  final ChartAdjust chartAdjust;
+
+  final CandleSticksStyle style;
+
+  final void Function(double) onPanDown;
+  final void Function() onPanEnd;
+
+  final Function() onReachEnd;
+
+  /// holds main window indicators data and high and low prices.
+  final MainWindowDataContainer mainWindowDataContainer;
+
+  final void Function(String)? onRemoveIndicator;
+
+  const DesktopChart({
+    super.key,
+    required this.onScaleUpdate,
+    required this.onHorizontalDragUpdate,
+    required this.candleWidth,
+    required this.candles,
+    required this.index,
+    required this.chartAdjust,
+    required this.onPanDown,
+    required this.onPanEnd,
+    required this.onReachEnd,
+    required this.mainWindowDataContainer,
+    required this.onRemoveIndicator,
+    required this.style,
+  });
+
+  @override
+  State<DesktopChart> createState() => _DesktopChartState();
+}
+
+class _DesktopChartState extends State<DesktopChart> {
+  double? mouseHoverX;
+  double? mouseHoverY;
+  bool isDragging = false;
+  bool showHoverIndicator = true;
+  double? manualScaleHigh;
+  double? manualScaleLow;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // determine charts width and height
+        final double maxWidth = constraints.maxWidth - PRICE_BAR_WIDTH;
+        final double maxHeight = constraints.maxHeight - DATE_BAR_HEIGHT;
+
+        // visible candles start and end indexes
+        final int candlesStartIndex = max(widget.index, 0);
+        final int candlesEndIndex = min(
+            maxWidth ~/ widget.candleWidth + widget.index,
+            widget.candles.length - 1);
+
+        if (candlesEndIndex == widget.candles.length - 1) {
+          Future(() {
+            widget.onReachEnd();
+          });
+        }
+
+        List<Candle> inRangeCandles = widget.candles
+            .getRange(candlesStartIndex, candlesEndIndex + 1)
+            .toList();
+
+        double candlesHighPrice = 0;
+        double candlesLowPrice = 0;
+        if (manualScaleHigh != null) {
+          candlesHighPrice = manualScaleHigh!;
+          candlesLowPrice = manualScaleLow!;
+        } else if (widget.chartAdjust == ChartAdjust.visibleRange) {
+          candlesHighPrice = widget.mainWindowDataContainer.highs
+              .getRange(candlesStartIndex, candlesEndIndex + 1)
+              .reduce(max);
+          candlesLowPrice = widget.mainWindowDataContainer.lows
+              .getRange(candlesStartIndex, candlesEndIndex + 1)
+              .reduce(min);
+        } else if (widget.chartAdjust == ChartAdjust.fullRange) {
+          candlesHighPrice = widget.mainWindowDataContainer.highs.reduce(max);
+          candlesLowPrice = widget.mainWindowDataContainer.lows.reduce(min);
+        }
+
+        if (candlesHighPrice == candlesLowPrice) {
+          candlesHighPrice += 10;
+          candlesLowPrice -= 10;
+        }
+
+        // calculate priceScale
+        double chartHeight =
+            maxHeight * 0.75 - 2 * (MAIN_CHART_VERTICAL_PADDING);
+
+        // calculate highest volume
+        double volumeHigh = inRangeCandles.map((e) => e.volume).reduce(max);
+
+        return TweenAnimationBuilder(
+          tween: Tween(begin: candlesHighPrice, end: candlesHighPrice),
+          duration: Duration(milliseconds: manualScaleHigh == null ? 300 : 0),
+          builder: (context, double high, _) {
+            return TweenAnimationBuilder(
+              tween: Tween(begin: candlesLowPrice, end: candlesLowPrice),
+              duration:
+                  Duration(milliseconds: manualScaleHigh == null ? 300 : 0),
+              builder: (context, double low, _) {
+                final currentCandle = mouseHoverX == null
+                    ? null
+                    : widget.candles[min(
+                        max(
+                            (maxWidth - mouseHoverX!) ~/ widget.candleWidth +
+                                widget.index,
+                            0),
+                        widget.candles.length - 1)];
+                return Container(
+                  color: widget.style.background,
+                  child: Stack(
+                    children: [
+                      TimeRow(
+                        style: widget.style,
+                        indicatorX: mouseHoverX,
+                        candles: widget.candles,
+                        candleWidth: widget.candleWidth,
+                        indicatorTime: currentCandle?.date,
+                        index: widget.index,
+                      ),
+                      Column(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Stack(
+                              children: [
+                                PriceColumn(
+                                  style: widget.style,
+                                  low: candlesLowPrice,
+                                  high: candlesHighPrice,
+                                  width: constraints.maxWidth,
+                                  chartHeight: chartHeight,
+                                  lastCandle: widget.candles[
+                                      widget.index < 0 ? 0 : widget.index],
+                                  onScale: (delta) {
+                                    if (manualScaleHigh == null) {
+                                      manualScaleHigh = candlesHighPrice;
+                                      manualScaleLow = candlesLowPrice;
+                                    }
+                                    setState(() {
+                                      double deltaPrice = delta /
+                                          chartHeight *
+                                          (manualScaleHigh! - manualScaleLow!);
+                                      manualScaleHigh =
+                                          manualScaleHigh! + deltaPrice;
+                                      manualScaleLow =
+                                          manualScaleLow! - deltaPrice;
+                                    });
+                                  },
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            right: BorderSide(
+                                              color: widget.style.borderColor,
+                                              width: 1,
+                                            ),
+                                          ),
+                                        ),
+                                        child: AnimatedPadding(
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical:
+                                                  MAIN_CHART_VERTICAL_PADDING),
+                                          child: RepaintBoundary(
+                                            child: Stack(
+                                              children: [
+                                                MainWindowIndicatorWidget(
+                                                  indicatorDatas: widget
+                                                      .mainWindowDataContainer
+                                                      .indicatorComponentData,
+                                                  index: widget.index,
+                                                  candleWidth:
+                                                      widget.candleWidth,
+                                                  low: low,
+                                                  high: high,
+                                                ),
+                                                CandleStickWidget(
+                                                  candles: widget.candles,
+                                                  candleWidth:
+                                                      widget.candleWidth,
+                                                  index: widget.index,
+                                                  high: high,
+                                                  low: low,
+                                                  bearColor:
+                                                      widget.style.primaryBear,
+                                                  bullColor:
+                                                      widget.style.primaryBull,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      width: PRICE_BAR_WIDTH,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        right: BorderSide(
+                                          color: widget.style.borderColor,
+                                          width: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 10.0),
+                                      child: VolumeWidget(
+                                        candles: widget.candles,
+                                        barWidth: widget.candleWidth,
+                                        index: widget.index,
+                                        high:
+                                            HelperFunctions.getRoof(volumeHigh),
+                                        bearColor: widget.style.secondaryBear,
+                                        bullColor: widget.style.secondaryBull,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: PRICE_BAR_WIDTH,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        height: DATE_BAR_HEIGHT,
+                                        child: Center(
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                "-${HelperFunctions.addMetricPrefix(HelperFunctions.getRoof(volumeHigh))}",
+                                                style: TextStyle(
+                                                  color:
+                                                      widget.style.borderColor,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(
+                            height: DATE_BAR_HEIGHT,
+                          ),
+                        ],
+                      ),
+                      mouseHoverY != null && showHoverIndicator
+                          ? Positioned(
+                              top: mouseHoverY! - 10,
+                              child: Row(
+                                children: [
+                                  DashLine(
+                                    length: maxWidth,
+                                    color: widget.style.borderColor,
+                                    direction: Axis.horizontal,
+                                    thickness: 0.5,
+                                  ),
+                                  Container(
+                                    color: widget
+                                        .style.hoverIndicatorBackgroundColor,
+                                    width: PRICE_BAR_WIDTH,
+                                    height: 20,
+                                    child: Center(
+                                      child: Text(
+                                        mouseHoverY! < maxHeight * 0.75
+                                            ? HelperFunctions.priceToString(high -
+                                                (mouseHoverY! -
+                                                        MAIN_CHART_VERTICAL_PADDING) /
+                                                    (maxHeight * 0.75 -
+                                                        2 *
+                                                            MAIN_CHART_VERTICAL_PADDING) *
+                                                    (high - low))
+                                            : HelperFunctions.addMetricPrefix(
+                                                HelperFunctions.getRoof(
+                                                        volumeHigh) *
+                                                    (1 -
+                                                        (mouseHoverY! -
+                                                                maxHeight *
+                                                                    0.75 -
+                                                                10) /
+                                                            (maxHeight * 0.25 -
+                                                                10))),
+                                        style: TextStyle(
+                                          color:
+                                              widget.style.secondaryTextColor,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Container(),
+                      mouseHoverX != null && showHoverIndicator
+                          ? Positioned(
+                              left: mouseHoverX,
+                              child: DashLine(
+                                length: constraints.maxHeight - 20,
+                                color: widget.style.borderColor,
+                                direction: Axis.vertical,
+                                thickness: 0.5,
+                              ),
+                            )
+                          : Container(),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 50, bottom: 20),
+                        child: Listener(
+                          onPointerSignal: (pointerSignal) {
+                            if (pointerSignal is PointerScrollEvent) {
+                              widget.onScaleUpdate(
+                                  pointerSignal.scrollDelta.direction * -1);
+                            }
+                          },
+                          child: MouseRegion(
+                            cursor: isDragging
+                                ? SystemMouseCursors.grabbing
+                                : SystemMouseCursors.precise,
+                            onHover: _onMouseHover,
+                            onExit: _onMouseExit,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onPanUpdate: (update) {
+                                mouseHoverX = update.localPosition.dx;
+                                mouseHoverY = update.localPosition.dy;
+                                widget.onHorizontalDragUpdate(
+                                    update.localPosition.dx);
+                                setState(() {
+                                  if (manualScaleHigh != null) {
+                                    double deltaPrice = update.delta.dy /
+                                        chartHeight *
+                                        (manualScaleHigh! - manualScaleLow!);
+                                    manualScaleHigh =
+                                        manualScaleHigh! + deltaPrice;
+                                    manualScaleLow =
+                                        manualScaleLow! + deltaPrice;
+                                  }
+                                });
+                              },
+                              onPanEnd: (update) {
+                                widget.onPanEnd();
+                                setState(() {
+                                  isDragging = false;
+                                });
+                                Future.delayed(
+                                    const Duration(milliseconds: 300), () {
+                                  setState(() {
+                                    showHoverIndicator = true;
+                                  });
+                                });
+                              },
+                              onPanDown: (update) {
+                                widget.onPanDown(update.localPosition.dx);
+                                setState(() {
+                                  isDragging = true;
+                                  showHoverIndicator = false;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 4, horizontal: 12),
+                        child: TopPanel(
+                          style: widget.style,
+                          onRemoveIndicator: widget.onRemoveIndicator,
+                          currentCandle: currentCandle,
+                          indicators: widget.mainWindowDataContainer.indicators,
+                          toggleIndicatorVisibility: (indicatorName) {
+                            setState(() {
+                              widget.mainWindowDataContainer
+                                  .toggleIndicatorVisibility(indicatorName);
+                            });
+                          },
+                          unvisibleIndicators: widget
+                              .mainWindowDataContainer.unvisibleIndicators,
+                        ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        width: PRICE_BAR_WIDTH,
+                        height: 20,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            backgroundColor:
+                                widget.style.hoverIndicatorBackgroundColor,
+                          ),
+                          onPressed: manualScaleHigh == null
+                              ? null
+                              : () {
+                                  setState(() {
+                                    manualScaleHigh = null;
+                                    manualScaleLow = null;
+                                  });
+                                },
+                          child: const Text("Auto"),
+                        ),
+                      )
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _onMouseExit(PointerEvent details) {
+    setState(() {
+      mouseHoverX = null;
+      mouseHoverY = null;
+    });
+  }
+
+  void _onMouseHover(PointerEvent details) {
+    setState(() {
+      mouseHoverX = details.localPosition.dx;
+      mouseHoverY = details.localPosition.dy;
+    });
+  }
+}
+
+```
+
+./lib/candlestick/widgets/mainwindow_indicator_widget.dart:
+```
+import 'package:flutter/material.dart';
+
+import '.././models/main_window_indicator.dart';
+
+class MainWindowIndicatorRenderObject extends RenderBox {
+  late List<IndicatorComponentData> _indicatorDatas;
+  late int _index;
+  late double _candleWidth;
+  late double _low;
+  late double _high;
+
+  MainWindowIndicatorRenderObject(
+    List<IndicatorComponentData> indicatorDatas,
+    int index,
+    double candleWidth,
+    double low,
+    double high,
+  ) {
+    _indicatorDatas = indicatorDatas;
+    _index = index;
+    _candleWidth = candleWidth;
+    _low = low;
+    _high = high;
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    double range = (_high - _low) / size.height;
+    for (var element in _indicatorDatas) {
+      if (element.visible == false) {
+        continue;
+      }
+      Path? path;
+      for (int i = 0; (i + 1) * _candleWidth < size.width; i++) {
+        if (i + _index >= element.values.length ||
+            i + _index < 0 ||
+            element.values[i + _index] == null) continue;
+        if (path == null) {
+          path = Path()
+            ..moveTo(size.width + offset.dx - (i + 0.5) * _candleWidth,
+                offset.dy + (_high - element.values[i + _index]!) / range);
+        } else {
+          path.lineTo(size.width + offset.dx - (i + 0.5) * _candleWidth,
+              offset.dy + (_high - element.values[i + _index]!) / range);
+        }
+      }
+      if (path != null) {
+        context.canvas.drawPath(
+            path,
+            Paint()
+              ..color = element.color
+              ..strokeWidth = 1
+              ..style = PaintingStyle.stroke);
+      }
+    }
+
+    context.canvas.save();
+    context.canvas.restore();
+  }
+
+  /// set size as large as possible
+  @override
+  void performLayout() {
+    size = Size(constraints.maxWidth, constraints.maxHeight);
+  }
+}
+
+class MainWindowIndicatorWidget extends LeafRenderObjectWidget {
+  final List<IndicatorComponentData> indicatorDatas;
+  final int index;
+  final double candleWidth;
+  final double high;
+  final double low;
+
+  const MainWindowIndicatorWidget({super.key, 
+    required this.indicatorDatas,
+    required this.index,
+    required this.candleWidth,
+    required this.low,
+    required this.high,
+  });
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return MainWindowIndicatorRenderObject(
+      indicatorDatas,
+      index,
+      candleWidth,
+      low,
+      high,
+    );
+  }
+
+  @override
+  void updateRenderObject(
+      BuildContext context, covariant RenderObject renderObject) {
+    MainWindowIndicatorRenderObject candlestickRenderObject =
+        renderObject as MainWindowIndicatorRenderObject;
+
+    candlestickRenderObject._indicatorDatas = indicatorDatas;
+    candlestickRenderObject._index = index;
+    candlestickRenderObject._candleWidth = candleWidth;
+    candlestickRenderObject._high = high;
+    candlestickRenderObject._low = low;
+    candlestickRenderObject.markNeedsPaint();
+    super.updateRenderObject(context, renderObject);
+  }
+}
+
+```
+
+./lib/candlestick/candlesticks.dart:
+```
+// ignore_for_file: library_private_types_in_public_api
+
+import 'dart:io' show Platform;
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
+import 'models/candle.dart';
+import 'models/candle_sticks_style.dart';
+import 'models/indicator.dart';
+import 'models/main_window_indicator.dart';
+import 'widgets/desktop_chart.dart';
+import 'widgets/mobile_chart.dart';
+import 'widgets/toolbar.dart';
+import 'widgets/toolbar_action.dart';
+
+/// StatefulWidget that holds Chart's State (index of
+/// current position and candles width).
+class Candlesticks extends StatefulWidget {
+  /// The arrangement of the array should be such that
+  /// the newest item is in position 0
+  final List<Candle> candles;
+
+  /// This callback calls when the last candle gets visible
+  final Future<void> Function()? onLoadMoreCandles;
+
+  /// List of buttons you what to add on top tool bar
+  final List<ToolBarAction> actions;
+
+  /// List of indicators to draw
+  final List<Indicator>? indicators;
+
+  /// This callback calls when ever user clicks a spcesific indicator close button (X)
+  final void Function(String)? onRemoveIndicator;
+
+  /// How chart price range will be adjusted when moving chart
+  final ChartAdjust chartAdjust;
+
+  /// Will zoom buttons be displayed in toolbar
+  final bool displayZoomActions;
+
+  /// Custom loading widget
+  final Widget? loadingWidget;
+
+  final CandleSticksStyle? style;
+
+  const Candlesticks({
+    super.key,
+    required this.candles,
+    this.onLoadMoreCandles,
+    this.actions = const [],
+    this.chartAdjust = ChartAdjust.visibleRange,
+    this.displayZoomActions = true,
+    this.loadingWidget,
+    this.indicators,
+    this.onRemoveIndicator,
+    this.style,
+  })  : assert(candles.length == 0 || candles.length > 1,
+            "Please provide at least 2 candles");
+
+  @override
+  _CandlesticksState createState() => _CandlesticksState();
+}
+
+enum ChartAdjust {
+  /// Will adjust chart size by max and min value from visible area
+  visibleRange,
+
+  /// Will adjust chart size by max and min value from the whole data
+  fullRange
+}
+
+class _CandlesticksState extends State<Candlesticks> {
+  /// index of the newest candle to be displayed
+  /// changes when user scrolls along the chart
+  int index = -10;
+  double lastX = 0;
+  int lastIndex = -10;
+
+  /// candleWidth controls the width of the single candles.
+  ///  range: [2...10]
+  double candleWidth = 6;
+
+  /// true when widget.onLoadMoreCandles is fetching new candles.
+  bool isCallingLoadMore = false;
+
+  MainWindowDataContainer? mainWindowDataContainer;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = widget.style ??
+        (Theme.of(context).brightness == Brightness.dark
+            ? CandleSticksStyle.dark()
+            : CandleSticksStyle.light());
+    return Column(
+      children: [
+        if (widget.displayZoomActions == true || widget.actions.isNotEmpty) ...[
+          ToolBar(
+            color: style.toolBarColor,
+            children: [
+              if (widget.displayZoomActions) ...[
+                ToolBarAction(
+                  onPressed: () {
+                    setState(() {
+                      candleWidth -= 2;
+                      candleWidth = max(candleWidth, 2);
+                    });
+                  },
+                  child: Icon(
+                    Icons.remove,
+                    color: style.borderColor,
+                  ),
+                ),
+                ToolBarAction(
+                  onPressed: () {
+                    setState(() {
+                      candleWidth += 2;
+                      candleWidth = min(candleWidth, 20);
+                    });
+                  },
+                  child: Icon(
+                    Icons.add,
+                    color: style.borderColor,
+                  ),
+                ),
+              ],
+              ...widget.actions
+            ],
+          ),
+        ],
+        if (widget.candles.isEmpty || mainWindowDataContainer == null)
+          Expanded(
+            child: Center(
+              child: widget.loadingWidget ??
+                  CircularProgressIndicator(color: style.loadingColor),
+            ),
+          )
+        else
+          Expanded(
+            child: TweenAnimationBuilder(
+              tween: Tween(begin: 6.toDouble(), end: candleWidth),
+              duration: const Duration(milliseconds: 120),
+              builder: (_, double width, __) {
+                if (kIsWeb ||
+                    Platform.isMacOS ||
+                    Platform.isWindows ||
+                    Platform.isLinux) {
+                  return DesktopChart(
+                    style: style,
+                    onRemoveIndicator: widget.onRemoveIndicator,
+                    mainWindowDataContainer: mainWindowDataContainer!,
+                    chartAdjust: widget.chartAdjust,
+                    onScaleUpdate: (double scale) {
+                      scale = max(0.90, scale);
+                      scale = min(1.1, scale);
+                      setState(() {
+                        candleWidth *= scale;
+                        candleWidth = min(candleWidth, 20);
+                        candleWidth = max(candleWidth, 2);
+                      });
+                    },
+                    onPanEnd: () {
+                      lastIndex = index;
+                    },
+                    onHorizontalDragUpdate: (double x) {
+                      setState(() {
+                        x = x - lastX;
+                        index = lastIndex + x ~/ candleWidth;
+                        index = max(index, -10);
+                        index = min(index, widget.candles.length - 1);
+                      });
+                    },
+                    onPanDown: (double value) {
+                      lastX = value;
+                      lastIndex = index;
+                    },
+                    onReachEnd: () {
+                      if (isCallingLoadMore == false &&
+                          widget.onLoadMoreCandles != null) {
+                        isCallingLoadMore = true;
+                        widget.onLoadMoreCandles!().then((_) {
+                          isCallingLoadMore = false;
+                        });
+                      }
+                    },
+                    candleWidth: width,
+                    candles: widget.candles,
+                    index: index,
+                  );
+                } else {
+                  return MobileChart(
+                    style: style,
+                    onRemoveIndicator: widget.onRemoveIndicator,
+                    mainWindowDataContainer: mainWindowDataContainer!,
+                    chartAdjust: widget.chartAdjust,
+                    onScaleUpdate: (double scale) {
+                      scale = max(0.90, scale);
+                      scale = min(1.1, scale);
+                      setState(() {
+                        candleWidth *= scale;
+                        candleWidth = min(candleWidth, 20);
+                        candleWidth = max(candleWidth, 2);
+                      });
+                    },
+                    onPanEnd: () {
+                      lastIndex = index;
+                    },
+                    onHorizontalDragUpdate: (double x) {
+                      setState(() {
+                        x = x - lastX;
+                        index = lastIndex + x ~/ candleWidth;
+                        index = max(index, -10);
+                        index = min(index, widget.candles.length - 1);
+                      });
+                    },
+                    onPanDown: (double value) {
+                      lastX = value;
+                      lastIndex = index;
+                    },
+                    onReachEnd: () {
+                      if (isCallingLoadMore == false &&
+                          widget.onLoadMoreCandles != null) {
+                        isCallingLoadMore = true;
+                        widget.onLoadMoreCandles!().then((_) {
+                          isCallingLoadMore = false;
+                        });
+                      }
+                    },
+                    candleWidth: width,
+                    candles: widget.candles,
+                    index: index,
+                  );
+                }
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant Candlesticks oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.candles.isEmpty) {
+      return;
+    }
+    if (mainWindowDataContainer == null) {
+      mainWindowDataContainer =
+          MainWindowDataContainer(widget.indicators ?? [], widget.candles);
+    } else {
+      final currentIndicators = widget.indicators ?? [];
+      final oldIndicators = oldWidget.indicators ?? [];
+      if (currentIndicators.length == oldIndicators.length) {
+        for (int i = 0; i < currentIndicators.length; i++) {
+          if (currentIndicators[i] == oldIndicators[i]) {
+            continue;
+          } else {
+            mainWindowDataContainer = MainWindowDataContainer(
+                widget.indicators ?? [], widget.candles);
+            return;
+          }
+        }
+      } else {
+        mainWindowDataContainer =
+            MainWindowDataContainer(widget.indicators ?? [], widget.candles);
+        return;
+      }
+      try {
+        mainWindowDataContainer!.tickUpdate(widget.candles);
+      } catch (_) {
+        mainWindowDataContainer =
+            MainWindowDataContainer(widget.indicators ?? [], widget.candles);
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.candles.isEmpty) {
+      return;
+    }
+    mainWindowDataContainer ??=
+        MainWindowDataContainer(widget.indicators ?? [], widget.candles);
+  }
+}
+
+```
+
+./lib/candlestick/models/candle.dart:
+```
+/// Candle model wich holds a single candle data.
+/// It contains five required double variables that hold a single candle data: high, low, open, close and volume.
+/// It can be instantiated using its default constructor or fromJson named custructor.
+class Candle {
+  /// DateTime for the candle
+  final DateTime date;
+
+  /// The highest price during this candle lifetime
+  /// It if always more than low, open and close
+  final double high;
+
+  /// The lowest price during this candle lifetime
+  /// It if always less than high, open and close
+  final double low;
+
+  /// Price at the beginning of the period
+  final double open;
+
+  /// Price at the end of the period
+  final double close;
+
+  /// Volume is the number of shares of a
+  /// security traded during a given period of time.
+  final double volume;
+
+  bool get isBull => open <= close;
+
+  Candle({
+    required this.date,
+    required this.high,
+    required this.low,
+    required this.open,
+    required this.close,
+    required this.volume,
+  });
+
+  Candle.fromJson(List<dynamic> json)
+      : date = DateTime.fromMillisecondsSinceEpoch(json[0]),
+        high = double.parse(json[2]),
+        low = double.parse(json[3]),
+        open = double.parse(json[1]),
+        close = double.parse(json[4]),
+        volume = double.parse(json[5]);
+}
+
+```
+
+./lib/candlestick/models/candle_sticks_style.dart:
+```
+import 'dart:ui';
+
+class CandleSticksStyle {
+  final Color borderColor;
+
+  final Color background;
+
+  final Color primaryBull;
+
+  final Color secondaryBull;
+
+  final Color primaryBear;
+
+  final Color secondaryBear;
+
+  final Color hoverIndicatorBackgroundColor;
+
+  final Color mobileCandleHoverColor;
+
+  final Color primaryTextColor;
+
+  final Color secondaryTextColor;
+
+  final Color loadingColor;
+
+  final Color toolBarColor;
+
+  CandleSticksStyle({
+    required this.borderColor,
+    required this.background,
+    required this.primaryBull,
+    required this.secondaryBull,
+    required this.primaryBear,
+    required this.secondaryBear,
+    required this.hoverIndicatorBackgroundColor,
+    required this.primaryTextColor,
+    required this.secondaryTextColor,
+    required this.mobileCandleHoverColor,
+    required this.loadingColor,
+    required this.toolBarColor,
+  });
+
+  factory CandleSticksStyle.dark({
+    Color? borderColor,
+    Color? background,
+    Color? primaryBull,
+    Color? secondaryBull,
+    Color? primaryBear,
+    Color? secondaryBear,
+    Color? hoverIndicatorBackgroundColor,
+    Color? primaryTextColor,
+    Color? secondaryTextColor,
+    Color? mobileCandleHoverColor,
+    Color? loadingColor,
+    Color? toolBarColor,
+  }) {
+    return CandleSticksStyle(
+      borderColor: borderColor ?? const Color(0xFF848E9C),
+      background: background ?? const Color(0xFF191B20),
+      primaryBull: primaryBull ?? const Color(0xFF26A69A),
+      secondaryBull: secondaryBull ?? const Color(0xFF005940),
+      primaryBear: primaryBear ?? const Color(0xFFEF5350),
+      secondaryBear: secondaryBear ?? const Color(0xFF82122B),
+      hoverIndicatorBackgroundColor:
+          hoverIndicatorBackgroundColor ?? const Color(0xFF4C525E),
+      primaryTextColor: primaryTextColor ?? const Color(0xFF848E9C),
+      secondaryTextColor: secondaryTextColor ?? const Color(0XFFFFFFFF),
+      mobileCandleHoverColor:
+          mobileCandleHoverColor ?? const Color(0xFFF0B90A).withOpacity(0.2),
+      loadingColor: loadingColor ?? const Color(0xFFF0B90A),
+      toolBarColor: toolBarColor ?? const Color(0xFF191B20),
+    );
+  }
+
+  factory CandleSticksStyle.light({
+    Color? borderColor,
+    Color? background,
+    Color? primaryBull,
+    Color? secondaryBull,
+    Color? primaryBear,
+    Color? secondaryBear,
+    Color? hoverIndicatorBackgroundColor,
+    Color? primaryTextColor,
+    Color? secondaryTextColor,
+    Color? mobileCandleHoverColor,
+    Color? loadingColor,
+    Color? toolBarColor,
+  }) {
+    return CandleSticksStyle(
+      borderColor: borderColor ?? const Color(0xFF848E9C),
+      background: background ?? const Color(0xFFFAFAFA),
+      primaryBull: primaryBull ?? const Color(0xEF26A69A),
+      secondaryBull: secondaryBull ?? const Color(0xFF8CCCC6),
+      primaryBear: primaryBear ?? const Color(0xFFEF5350),
+      secondaryBear: secondaryBear ?? const Color(0xFFF1A3A1),
+      hoverIndicatorBackgroundColor:
+          hoverIndicatorBackgroundColor ?? const Color(0xFF131722),
+      primaryTextColor: primaryTextColor ?? const Color(0XFF000000),
+      secondaryTextColor: secondaryTextColor ?? const Color(0XFFFFFFFF),
+      mobileCandleHoverColor:
+          mobileCandleHoverColor ?? const Color(0xFFF0B90A).withOpacity(0.2),
+      loadingColor: loadingColor ?? const Color(0xFFF0B90A),
+      toolBarColor: toolBarColor ?? const Color(0xFFFAFAFA),
+    );
+  }
+}
+
+```
+
+./lib/candlestick/models/main_window_indicator.dart:
+```
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '.././models/indicator.dart';
+import 'candle.dart';
+
+class IndicatorComponentData {
+  final String name;
+  final Color color;
+  final List<double?> values = [];
+  final Indicator parentIndicator;
+  bool visible = true;
+  IndicatorComponentData(this.parentIndicator, this.name, this.color);
+}
+
+class MainWindowDataContainer {
+  List<IndicatorComponentData> indicatorComponentData = [];
+  List<Indicator> indicators;
+  List<double> highs = [];
+  List<double> lows = [];
+  List<String> unvisibleIndicators = [];
+  late DateTime beginDate;
+  late DateTime endDate;
+
+  MainWindowDataContainer(this.indicators, List<Candle> candles) {
+    endDate = candles[0].date;
+    beginDate = candles.last.date;
+    for (var indicator in indicators) {
+      for (var indicatorComponent in indicator.indicatorComponentsStyles) {
+        indicatorComponentData.add(IndicatorComponentData(
+            indicator, indicatorComponent.name, indicatorComponent.color));
+      }
+    }
+
+    highs = candles.map((e) => e.high).toList();
+    lows = candles.map((e) => e.low).toList();
+
+    for (var indicator in indicators) {
+      final List<IndicatorComponentData> containers = indicatorComponentData
+          .where((element) => element.parentIndicator == indicator)
+          .toList();
+
+      for (int i = 0; i < candles.length; i++) {
+        double low = lows[i];
+        double high = highs[i];
+
+        List<double?> indicatorDatas = List.generate(
+            indicator.indicatorComponentsStyles.length, (index) => null);
+
+        if (i + indicator.dependsOnNPrevCandles < candles.length) {
+          indicatorDatas = indicator.calculator(i, candles);
+        }
+
+        for (int i = 0; i < indicatorDatas.length; i++) {
+          containers[i].values.add(indicatorDatas[i]);
+          if (indicatorDatas[i] != null) {
+            low = math.min(low, indicatorDatas[i]!);
+            high = math.max(high, indicatorDatas[i]!);
+          }
+        }
+        lows[i] = low;
+        highs[i] = high;
+      }
+    }
+  }
+
+  void tickUpdate(List<Candle> candles) {
+    // update last candles
+    for (int i = 0; candles[i].date.compareTo(endDate) > 0; i++) {
+      highs.insert(i, candles[i].high);
+      lows.insert(i, candles[i].low);
+      for (var element in indicatorComponentData) {
+        element.values.insert(i, null);
+      }
+    }
+    for (var indicator in indicators) {
+      final List<IndicatorComponentData> containers = indicatorComponentData
+          .where((element) => element.parentIndicator == indicator)
+          .toList();
+
+      for (int i = 0; candles[i].date.compareTo(endDate) >= 0; i++) {
+        double low = lows[i];
+        double high = highs[i];
+
+        List<double?> indicatorDatas = List.generate(
+            indicator.indicatorComponentsStyles.length, (index) => null);
+
+        if (i + indicator.dependsOnNPrevCandles < candles.length) {
+          indicatorDatas = indicator.calculator(i, candles);
+        }
+
+        for (int j = 0; j < indicatorDatas.length; j++) {
+          containers[j].values[i] = indicatorDatas[j];
+          if (indicatorDatas[j] != null) {
+            low = math.min(low, indicatorDatas[j]!);
+            high = math.max(high, indicatorDatas[j]!);
+          }
+        }
+        lows[i] = low;
+        highs[i] = high;
+      }
+    }
+    endDate = candles[0].date;
+
+    // update prev candles
+    int firstCandleIndex = 0;
+    for (int i = candles.length - 1; i >= 0; i--) {
+      if (candles[i].date == beginDate) {
+        firstCandleIndex = i;
+        break;
+      }
+    }
+    for (int i = firstCandleIndex + 1; i < candles.length; i++) {
+      highs.add(candles[i].high);
+      lows.add(candles[i].low);
+      for (var element in indicatorComponentData) {
+        element.values.add(null);
+      }
+    }
+    for (var indicator in indicators) {
+      final List<IndicatorComponentData> containers = indicatorComponentData
+          .where((element) => element.parentIndicator == indicator)
+          .toList();
+
+      for (int i = firstCandleIndex - indicator.dependsOnNPrevCandles + 1;
+          i < candles.length;
+          i++) {
+        double low = lows[i];
+        double high = highs[i];
+
+        List<double?> indicatorDatas = List.generate(
+            indicator.indicatorComponentsStyles.length, (index) => null);
+
+        if (i + indicator.dependsOnNPrevCandles < candles.length) {
+          indicatorDatas = indicator.calculator(i, candles);
+        }
+
+        for (int j = 0; j < indicatorDatas.length; j++) {
+          containers[j].values[i] = indicatorDatas[j];
+          if (indicatorDatas[j] != null) {
+            low = math.min(low, indicatorDatas[j]!);
+            high = math.max(high, indicatorDatas[j]!);
+          }
+        }
+        lows[i] = low;
+        highs[i] = high;
+      }
+    }
+    beginDate = candles.last.date;
+  }
+
+  void toggleIndicatorVisibility(String indicatorName) {
+    if (unvisibleIndicators.contains(indicatorName)) {
+      unvisibleIndicators.remove(indicatorName);
+      for (var element in indicatorComponentData) {
+        if (element.parentIndicator.name == indicatorName) {
+          element.visible = true;
+        }
+      }
+    } else {
+      unvisibleIndicators.add(indicatorName);
+      for (var element in indicatorComponentData) {
+        if (element.parentIndicator.name == indicatorName) {
+          element.visible = false;
+        }
+      }
+    }
+  }
+}
+
+```
+
+./lib/candlestick/models/indicator.dart:
+```
+// ignore_for_file: unnecessary_overrides
+
+import 'package:flutter/material.dart';
+
+import 'candle.dart';
+
+class Indicator {
+  /// Indicator name. visible at top right side of chart
+  final String name;
+
+  /// Calculates indicator value for givien index.
+  /// if your indicator has muliple lines (values) always return results in the same order.
+  final List<double?> Function(int index, List<Candle> candles) calculator;
+  final int dependsOnNPrevCandles;
+
+  /// Indicator lines style.
+  /// the order of this should be same as calculator function results order.
+  final List<IndicatorStyle> indicatorComponentsStyles;
+
+  Indicator({
+    required this.name,
+    required this.dependsOnNPrevCandles,
+    required this.calculator,
+    required this.indicatorComponentsStyles,
+  });
+
+  @override
+  int get hashCode => super.hashCode;
+
+  @override
+  bool operator ==(other) {
+    if (other is Indicator) {
+      return other.name == name;
+    } else {
+      return false;
+    }
+  }
+}
+
+class IndicatorStyle {
+  final String name;
+  final Color color;
+
+  IndicatorStyle({
+    required this.name,
+    required this.color,
+  });
+}
+
+```
+
+./lib/candlestick/constant/view_constants.dart:
+```
+// ignore_for_file: constant_identifier_names
+
+const double DATE_BAR_HEIGHT = 20;
+const double MAIN_CHART_VERTICAL_PADDING = 10;
+const double MIN_PRICETILE_HEIGHT = 50;
+const double PRICE_BAR_WIDTH = 60;
+const double PRICE_INDICATOR_HEIGHT = 20;
+
+```
+
+./lib/candlestick/utils/indicators/weighted_moving_average.dart:
+```
+import 'dart:ui';
+
+import '../../models/indicator.dart';
+
+
+
+class WeightedMovingAverageIndicator extends Indicator {
+  WeightedMovingAverageIndicator({
+    required int length,
+    required Color color,
+  }) : super(
+          name: "WMA $length",
+          dependsOnNPrevCandles: length,
+          calculator: (index, candles) {
+            double sum = 0;
+            for (int i = 0; i < length; i++) {
+              sum += candles[i + index].close * (length - i);
+            }
+            return [sum / (length * (length + 1)) * 2];
+          },
+          indicatorComponentsStyles: [
+            IndicatorStyle(name: "wmv", color: color),
+          ],
+        );
+}
+
+```
+
+./lib/candlestick/utils/indicators/moving_average_indicator.dart:
+```
+import 'dart:ui';
+
+import '../../models/indicator.dart';
+
+class MovingAverageIndicator extends Indicator {
+  MovingAverageIndicator({
+    required int length,
+    required Color color,
+  }) : super(
+          name: "MA $length",
+          dependsOnNPrevCandles: length,
+          calculator: (index, candles) {
+            double sum = 0;
+            for (int i = 0; i < length; i++) {
+              sum += candles[i + index].close;
+            }
+            return [sum / length];
+          },
+          indicatorComponentsStyles: [
+            IndicatorStyle(name: "mv", color: color),
+          ],
+        );
+}
+
+```
+
+./lib/candlestick/utils/indicators/bollinger_bands_indicator.dart:
+```
+import 'dart:math' as math;
+import 'dart:ui';
+
+import '../../models/indicator.dart';
+
+
+
+class BollingerBandsIndicator extends Indicator {
+  BollingerBandsIndicator({
+    required int length,
+    required int stdDev,
+    required Color upperColor,
+    required Color basisColor,
+    required Color lowerColor,
+  }) : super(
+          name: "BB $length",
+          dependsOnNPrevCandles: length,
+          calculator: (index, candles) {
+            double sum = 0;
+            for (int i = index; i < index + length; i++) {
+              sum += candles[i].close;
+            }
+            final average = sum / length;
+
+            num sumOfSquaredDiffFromMean = 0;
+            for (int i = index; i < index + length; i++) {
+              final squareDiffFromMean =
+                  math.pow(candles[i].close - average, 2);
+              sumOfSquaredDiffFromMean += squareDiffFromMean;
+            }
+
+            final variance = sumOfSquaredDiffFromMean / length;
+
+            final standardDeviation = math.sqrt(variance);
+
+            return [
+              average + standardDeviation * stdDev,
+              average,
+              average - standardDeviation * stdDev
+            ];
+          },
+          indicatorComponentsStyles: [
+            IndicatorStyle(name: "upper", color: upperColor),
+            IndicatorStyle(name: "basis", color: basisColor),
+            IndicatorStyle(name: "lower", color: lowerColor)
+          ],
+        );
+}
+
+```
+
+./lib/candlestick/utils/helper_functions.dart:
+```
+import 'dart:math';
+
+import '.././constant/view_constants.dart';
+
+class HelperFunctions {
+  static String addMetricPrefix(double price) {
+    if (price < 1) price = 1;
+    int log = log10(price).floor();
+    if (log > 9) {
+      return "${price ~/ 1000000000}B";
+    } else if (log > 6) {
+      return "${price ~/ 1000000}M";
+    } else if (log > 3) {
+      return "${price ~/ 1000}K";
+    } else {
+      return price.toStringAsFixed(0);
+    }
+  }
+
+  static double calculatePriceScale(double height, double high, double low) {
+    int minTiles = (height / MIN_PRICETILE_HEIGHT).floor();
+    minTiles = max(2, minTiles);
+    double sizeRange = high - low;
+    assert(sizeRange != 0,
+        "highest highs and lowest lows of visible candles are equal.");
+    double minStepSize = sizeRange / minTiles;
+    double base =
+        pow(10, HelperFunctions.log10(minStepSize).floor()).toDouble();
+
+    if (2 * base > minStepSize) return 2 * base;
+    if (5 * base > minStepSize) return 5 * base;
+    return 10 * base;
+  }
+
+  static double getRoof(double number) {
+    if (number == 0) {
+      return 1;
+    }
+    int log = log10(number).floor();
+    return (number ~/ pow(10, log) + 1) * pow(10, log).toDouble();
+  }
+
+  static double log10(num x) => log(x) / ln10;
+
+  static String priceToString(double price) {
+    return price.abs() > 1000
+        ? price.toStringAsFixed(2)
+        : price.abs() > 100
+            ? price.toStringAsFixed(3)
+            : price.abs() > 10
+                ? price.toStringAsFixed(4)
+                : price.abs() > 1
+                    ? price.toStringAsFixed(5)
+                    : price.toStringAsFixed(7);
+  }
+}
+
+```
+
 ./lib/routes.dart:
 ```
 // lib/routes.dart
@@ -1772,6 +4653,8 @@ class BacktestProgressChart extends StatelessWidget {
 
 ./lib/features/strategy/ui/pages/strategy_page.dart:
 ```
+import 'package:cost_averaging_trading_app/candlestick/candlesticks.dart';
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_bloc.dart';
@@ -1817,6 +4700,8 @@ class StrategyPage extends StatelessWidget {
         const SizedBox(height: 16),
         if (state.status == StrategyStateStatus.active)
           _buildStrategyMonitor(state),
+        const SizedBox(height: 16),
+        _buildCandlestickChart(state),
       ];
     } else if (state is BacktestCompleted) {
       return [BacktestResultView(result: state.result)];
@@ -1826,6 +4711,41 @@ class StrategyPage extends StatelessWidget {
       return [Center(child: Text('Strategy Error: ${state.message}'))];
     }
     return [const Center(child: Text('Unknown state'))];
+  }
+
+  Widget _buildCandlestickChart(StrategyLoaded state) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Market Chart',
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 400,
+              child: Candlesticks(
+                candles: state.chartData
+                    .map((data) => Candle(
+                          date: data['date'],
+                          high: data['high'],
+                          low: data['low'],
+                          open: data['open'],
+                          close: data['close'],
+                          volume: data['volume'],
+                        ))
+                    .toList(),
+                onLoadMoreCandles: () async {
+                  // Implementa la logica per caricare più candele
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildStrategyStatus(BuildContext context, StrategyLoaded state) {
@@ -2617,6 +5537,8 @@ class StopStrategyEvent extends StrategyEvent {}
 
 ./lib/features/strategy/repositories/strategy_repository.dart:
 ```
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
 import 'package:cost_averaging_trading_app/core/services/trading_service.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
@@ -2624,9 +5546,12 @@ import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_stat
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 
 class StrategyRepository {
+  final ApiService apiService;
+
   final DatabaseService databaseService;
 
   StrategyRepository({
+    required this.apiService,
     required this.databaseService,
   });
 
@@ -2777,6 +5702,25 @@ class StrategyRepository {
       }).toList();
     } catch (e) {
       throw Exception('Failed to get strategy chart data: $e');
+    }
+  }
+
+  Future<List<Candle>> getChartData(String symbol, String interval) async {
+    try {
+      final rawData =
+          await apiService.getKlines(symbol: symbol, interval: interval);
+      return rawData
+          .map((data) => Candle(
+                date: DateTime.fromMillisecondsSinceEpoch(data[0]),
+                open: double.parse(data[1]),
+                high: double.parse(data[2]),
+                low: double.parse(data[3]),
+                close: double.parse(data[4]),
+                volume: double.parse(data[5]),
+              ))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch chart data: $e');
     }
   }
 }
@@ -2968,8 +5912,8 @@ class StrategyModel {
 
 ./lib/features/chart/blocs/chart_event.dart:
 ```
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:equatable/equatable.dart';
-import 'package:candlesticks/candlesticks.dart';
 
 abstract class ChartEvent extends Equatable {
   const ChartEvent();
@@ -3011,8 +5955,8 @@ class UpdateTicker extends ChartEvent {
 
 ./lib/features/chart/blocs/chart_state.dart:
 ```
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:equatable/equatable.dart';
-import 'package:candlesticks/candlesticks.dart';
 
 abstract class ChartState extends Equatable {
   const ChartState();
@@ -3052,7 +5996,7 @@ class ChartError extends ChartState {
 ./lib/features/chart/blocs/chart_bloc.dart:
 ```
 import 'dart:async';
-import 'package:candlesticks/candlesticks.dart';
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
@@ -4210,6 +7154,53 @@ class PortfolioOverview extends StatelessWidget {
 }
 ```
 
+./lib/features/dashboard/ui/widgets/market_chart.dart:
+```
+import 'package:cost_averaging_trading_app/candlestick/candlesticks.dart';
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
+import 'package:flutter/material.dart';
+
+class MarketChart extends StatelessWidget {
+  final List<Candle> candles;
+  final String symbol;
+  final Function(String) onSymbolChanged;
+
+  const MarketChart({
+    Key? key,
+    required this.candles,
+    required this.symbol,
+    required this.onSymbolChanged,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        DropdownButton<String>(
+          value: symbol,
+          items: ['ETHBTC', 'BTCUSDT', 'ETHUSDT'].map((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              onSymbolChanged(newValue);
+            }
+          },
+        ),
+        Expanded(
+          child: Candlesticks(
+            candles: candles,
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
 ./lib/features/dashboard/ui/widgets/recent_trades_widget.dart:
 ```
 import 'package:flutter/material.dart';
@@ -4335,16 +7326,15 @@ class PerformanceChart extends StatelessWidget {
 
 ./lib/features/dashboard/ui/pages/dashboard_page.dart:
 ```
-import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/recent_trades_widget.dart';
-import 'package:cost_averaging_trading_app/core/widgets/custom_candlestick_chart.dart';
-import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_state.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_event.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/portfolio_overview.dart';
-import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/performance_chart.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/market_chart.dart';
+import 'package:cost_averaging_trading_app/features/dashboard/ui/widgets/recent_trades_widget.dart';
+import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -4376,8 +7366,6 @@ class DashboardPage extends StatelessWidget {
         _buildMarketChart(context, state),
         const SizedBox(height: 16),
         _buildRecentTrades(context, state),
-        const SizedBox(height: 16),
-        _buildPerformanceSummary(context, state),
       ];
     } else if (state is DashboardError) {
       return [Center(child: Text('Error: ${state.message}'))];
@@ -4409,9 +7397,12 @@ class DashboardPage extends StatelessWidget {
             const SizedBox(height: 8),
             SizedBox(
               height: 300,
-              child: CustomCandlestickChart(
-                symbol: state.activeStrategy?.symbol ?? 'BTCUSDT',
-                trades: state.recentTrades,
+              child: MarketChart(
+                candles: state.marketData,
+                symbol: state.selectedSymbol,
+                onSymbolChanged: (String symbol) {
+                  context.read<DashboardBloc>().add(ChangeSymbol(symbol));
+                },
               ),
             ),
           ],
@@ -4424,70 +7415,13 @@ class DashboardPage extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Recent Trades',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            RecentTradesWidget(
-              trades: state.recentTrades,
-              onViewAllTrades: () {
-                // Navigate to Trade History page
-              },
-            ),
-          ],
+        child: RecentTradesWidget(
+          trades: state.recentTrades,
+          onViewAllTrades: () {
+            Navigator.pushNamed(context, '/trade-history');
+          },
         ),
       ),
-    );
-  }
-
-  Widget _buildPerformanceSummary(BuildContext context, DashboardLoaded state) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Performance Summary',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildPerformanceItem(
-                    context, 'Daily P/L', state.dailyProfitLoss),
-                _buildPerformanceItem(
-                    context, 'Weekly P/L', state.weeklyProfitLoss),
-                _buildPerformanceItem(
-                    context, 'Monthly P/L', state.monthlyProfitLoss),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 100,
-              child: PerformanceChart(data: state.performanceData),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPerformanceItem(
-      BuildContext context, String label, double value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-        Text(
-          '${value >= 0 ? '+' : ''}${value.toStringAsFixed(2)}',
-          style: TextStyle(
-            color: value >= 0 ? Colors.green : Colors.red,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -4512,10 +7446,19 @@ class ChangeTradesPerPage extends DashboardEvent {
   ChangeTradesPerPage(this.tradesPerPage);
 }
 
+class ChangeSymbol extends DashboardEvent {
+  final String symbol;
+
+  ChangeSymbol(this.symbol);
+
+  List<Object> get props => [symbol];
+}
+
 ```
 
 ./lib/features/dashboard/blocs/dashboard_state.dart:
 ```
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:equatable/equatable.dart';
 import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
@@ -4541,6 +7484,8 @@ class DashboardLoaded extends DashboardState {
   final double dailyProfitLoss;
   final double weeklyProfitLoss;
   final double monthlyProfitLoss;
+  final List<Candle> marketData;
+  final String selectedSymbol;
 
   const DashboardLoaded({
     required this.portfolio,
@@ -4551,6 +7496,8 @@ class DashboardLoaded extends DashboardState {
     required this.dailyProfitLoss,
     required this.weeklyProfitLoss,
     required this.monthlyProfitLoss,
+    required this.marketData,
+    required this.selectedSymbol,
   });
 
   @override
@@ -4563,6 +7510,8 @@ class DashboardLoaded extends DashboardState {
         dailyProfitLoss,
         weeklyProfitLoss,
         monthlyProfitLoss,
+        marketData,
+        selectedSymbol,
       ];
 }
 
@@ -4574,6 +7523,7 @@ class DashboardError extends DashboardState {
   @override
   List<Object> get props => [message];
 }
+
 ```
 
 ./lib/features/dashboard/blocs/dashboard_bloc.dart:
@@ -4604,26 +7554,31 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final dailyProfitLoss = await _repository.getDailyProfitLoss();
       final weeklyProfitLoss = await _repository.getWeeklyProfitLoss();
       final monthlyProfitLoss = await _repository.getMonthlyProfitLoss();
+      final marketData = await _repository.getMarketData('BTCUSDT');
+      final selectedSymbol = 'BTCUSDT';
 
       emit(DashboardLoaded(
-        portfolio: portfolio,
-        recentTrades: recentTrades,
-        performanceData: performanceData,
-        activeStrategy: activeStrategy,
-        dailyChange: dailyChange,
-        dailyProfitLoss: dailyProfitLoss,
-        weeklyProfitLoss: weeklyProfitLoss,
-        monthlyProfitLoss: monthlyProfitLoss,
-      ));
+          portfolio: portfolio,
+          recentTrades: recentTrades,
+          performanceData: performanceData,
+          activeStrategy: activeStrategy,
+          dailyChange: dailyChange,
+          dailyProfitLoss: dailyProfitLoss,
+          weeklyProfitLoss: weeklyProfitLoss,
+          monthlyProfitLoss: monthlyProfitLoss,
+          marketData: marketData,
+          selectedSymbol: selectedSymbol));
     } catch (e) {
       emit(DashboardError(e.toString()));
     }
   }
 }
+
 ```
 
 ./lib/features/dashboard/repositories/dashboard_repository.dart:
 ```
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
@@ -4638,6 +7593,26 @@ class DashboardRepository {
     required this.apiService,
     required this.databaseService,
   });
+
+  Future<List<Candle>> getMarketData(String symbol) async {
+    try {
+      return await apiService.getKlineData(symbol, '1h');
+    } catch (e) {
+      // In caso di errore, restituisci dati di esempio
+      return List.generate(100, (index) {
+        final date = DateTime.now().subtract(Duration(hours: 100 - index));
+        final basePrice = 30000.0 + (index * 10);
+        return Candle(
+          date: date,
+          open: basePrice,
+          high: basePrice + 50,
+          low: basePrice - 50,
+          close: basePrice + 20,
+          volume: 1000.0 + (index * 10),
+        );
+      });
+    }
+  }
 
   Future<Portfolio> getPortfolio() async {
     try {
@@ -5568,181 +8543,6 @@ class LoadingIndicator extends StatelessWidget {
 
 ```
 
-./lib/core/widgets/custom_candlestick_chart.dart:
-```
-import 'package:candlesticks/candlesticks.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:cost_averaging_trading_app/features/chart/blocs/chart_bloc.dart';
-import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
-import 'package:cost_averaging_trading_app/features/chart/blocs/chart_state.dart';
-import 'package:cost_averaging_trading_app/core/models/trade.dart';
-import 'package:cost_averaging_trading_app/core/services/api_service.dart';
-
-class CustomCandlestickChart extends StatefulWidget {
-  final String symbol;
-  final List<CoreTrade> trades;
-
-  const CustomCandlestickChart({
-    super.key,
-    required this.symbol,
-    required this.trades,
-  });
-
-  @override
-  CustomCandlestickChartState createState() => CustomCandlestickChartState();
-}
-
-class CustomCandlestickChartState extends State<CustomCandlestickChart> {
-  late ChartBloc _chartBloc;
-
-  @override
-  void initState() {
-    super.initState();
-    _chartBloc = ChartBloc(
-      symbol: widget.symbol,
-      apiService: context.read<ApiService>(),
-    );
-    _chartBloc.add(LoadChartData());
-  }
-
-  @override
-  void dispose() {
-    _chartBloc.close();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocConsumer<ChartBloc, ChartState>(
-      bloc: _chartBloc,
-      listener: (context, state) {
-        if (state is ChartError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
-        }
-      },
-      builder: (context, state) {
-        if (state is ChartLoading) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is ChartLoaded && state.candles.isNotEmpty) {
-          return _buildChart(context, state);
-        } else if (state is ChartError) {
-          return Center(child: Text('Error: ${state.message}'));
-        }
-        return const Center(child: Text('No data available'));
-      },
-    );
-  }
-
-  Widget _buildChart(BuildContext context, ChartLoaded state) {
-    final validCandles =
-        state.candles.where((candle) => candle.low != null).toList();
-
-    if (validCandles.isEmpty) {
-      return const Center(child: Text('No valid candle data available'));
-    }
-
-    return AspectRatio(
-      aspectRatio: 1.5,
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          barGroups: _createBarGroups(validCandles),
-          titlesData: FlTitlesData(
-            show: true,
-            bottomTitles: _bottomTitles(),
-            leftTitles: _leftTitles(),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: true,
-            getDrawingHorizontalLine: (value) {
-              return FlLine(
-                color: Colors.grey[300],
-                strokeWidth: 1,
-              );
-            },
-            getDrawingVerticalLine: (value) {
-              return FlLine(
-                color: Colors.grey[300],
-                strokeWidth: 1,
-              );
-            },
-          ),
-          borderData: FlBorderData(
-            show: true,
-            border: Border.all(color: Colors.grey[300]!, width: 1),
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<BarChartGroupData> _createBarGroups(List<Candle> candles) {
-    return candles.asMap().entries.map((entry) {
-      final index = entry.key;
-      final candle = entry.value;
-      final open = candle.open;
-      final close = candle.close;
-      final high = candle.high;
-      final low = candle.low;
-
-      return BarChartGroupData(
-        x: index,
-        barRods: [
-          BarChartRodData(
-            toY: high,
-            fromY: low,
-            color: open > close ? Colors.red : Colors.green,
-            width: 8,
-          ),
-        ],
-      );
-    }).toList();
-  }
-
-  AxisTitles _bottomTitles() {
-    return AxisTitles(
-      sideTitles: SideTitles(
-        showTitles: true,
-        getTitlesWidget: (value, meta) {
-          final index = value.toInt();
-          if (index % 5 == 0) {
-            return Text(
-              '${index + 1}',
-              style: const TextStyle(color: Colors.black, fontSize: 10),
-            );
-          }
-          return const SizedBox.shrink();
-        },
-      ),
-    );
-  }
-
-  AxisTitles _leftTitles() {
-    return AxisTitles(
-      sideTitles: SideTitles(
-        showTitles: true,
-        getTitlesWidget: (value, meta) {
-          return Text(
-            value.toStringAsFixed(2),
-            style: const TextStyle(color: Colors.black, fontSize: 10),
-          );
-        },
-      ),
-    );
-  }
-}
-
-```
-
 ./lib/core/dtos/portfolio_dto.dart:
 ```
 import 'dart:convert';
@@ -5963,7 +8763,6 @@ class PortfolioEntity extends Equatable {
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
@@ -5997,11 +8796,7 @@ class AppProviders extends StatelessWidget {
           ),
         ),
         RepositoryProvider<DatabaseService>(
-          create: (context) {
-            final databaseService = DatabaseService();
-            _initializeDatabase(databaseService);
-            return databaseService;
-          },
+          create: (context) => DatabaseService(),
         ),
         RepositoryProvider<SecureStorageService>(
           create: (context) => SecureStorageService(),
@@ -6019,6 +8814,7 @@ class AppProviders extends StatelessWidget {
         ),
         RepositoryProvider<StrategyRepository>(
           create: (context) => StrategyRepository(
+            apiService: context.read<ApiService>(),
             databaseService: context.read<DatabaseService>(),
           ),
         ),
@@ -6051,10 +8847,8 @@ class AppProviders extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           BlocProvider<DashboardBloc>(
-            create: (context) => DashboardBloc(
-              context.read<DashboardRepository>(),
-              //context.read<StrategyRepository>(),
-            ),
+            create: (context) =>
+                DashboardBloc(context.read<DashboardRepository>()),
           ),
           BlocProvider<PortfolioBloc>(
             create: (context) =>
@@ -6081,21 +8875,21 @@ class AppProviders extends StatelessWidget {
       ),
     );
   }
-
-  void _initializeDatabase(DatabaseService databaseService) {
-    databaseService.initDatabase().then((_) async {
-      bool isHealthy = await databaseService.isDatabaseHealthy();
-      if (isHealthy) {
-        await databaseService.performMaintenance();
-        await databaseService.checkAndCleanupOldData();
-        await databaseService.optimizeDatabasePerformance();
-      } else {
-        await databaseService.backupDatabase();
-      }
-    }).catchError((error) {});
-  }
 }
 
+```
+
+./lib/core/config/chart_config.dart:
+```
+class ChartConfig {
+  final double initialCandleWidth;
+  final int initialVisibleCandleCount;
+
+  const ChartConfig({
+    required this.initialCandleWidth,
+    required this.initialVisibleCandleCount,
+  });
+}
 ```
 
 ./lib/core/mappers/trade_mapper.dart:
@@ -6816,8 +9610,6 @@ class BacktestingService {
     final klines = await apiService.getKlines(
       symbol: symbol,
       interval: '1d',
-      startTime: startDate.millisecondsSinceEpoch,
-      endTime: endDate.millisecondsSinceEpoch,
     );
 
     return klines
@@ -6902,6 +9694,7 @@ class BacktestPerformance {
 ```
 import 'dart:convert';
 import 'dart:io';
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -6926,8 +9719,6 @@ class ApiService {
       rethrow;
     }
   }
-
-  
 
   Stream<Map<String, dynamic>> getTickerStream(String symbol) {
     final wsUrl =
@@ -7087,23 +9878,13 @@ class ApiService {
     return await get('/api/v3/exchangeInfo', requiresAuth: false);
   }
 
-Future<List<List<dynamic>>> getKlines({
+  Future<List<List<dynamic>>> getKlines({
     required String symbol,
     required String interval,
     int? limit,
-    int? startTime,
-    int? endTime,
   }) async {
-    final queryParams = {
-      'symbol': symbol,
-      'interval': interval,
-      if (limit != null) 'limit': limit.toString(),
-      if (startTime != null) 'startTime': startTime.toString(),
-      if (endTime != null) 'endTime': endTime.toString(),
-    };
-
-    final uri = Uri.parse('$baseUrl/api/v3/klines')
-        .replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+        '$baseUrl/klines?symbol=$symbol&interval=$interval${limit != null ? '&limit=$limit' : ''}');
     final response = await http.get(uri);
 
     if (response.statusCode == 200) {
@@ -7111,6 +9892,25 @@ Future<List<List<dynamic>>> getKlines({
     } else {
       throw Exception('Failed to load klines');
     }
+  }
+
+  Future<List<Candle>> getKlineData(String symbol, String interval) async {
+    final response = await get('/api/v3/klines', queryParams: {
+      'symbol': symbol,
+      'interval': interval,
+      'limit': '100',
+    });
+
+    return (response as List)
+        .map((item) => Candle(
+              date: DateTime.fromMillisecondsSinceEpoch(item[0]),
+              open: double.parse(item[1]),
+              high: double.parse(item[2]),
+              low: double.parse(item[3]),
+              close: double.parse(item[4]),
+              volume: double.parse(item[5]),
+            ))
+        .toList();
   }
 
   Stream<Map<String, dynamic>> getKlineStream(String symbol, String interval) {
@@ -7122,11 +9922,11 @@ Future<List<List<dynamic>>> getKlines({
       return jsonDecode(event);
     });
   }
+
   Future<Map<String, dynamic>> get24hrTickerPriceChange(String symbol) async {
     return await get('/api/v3/ticker/24hr',
         queryParams: {'symbol': symbol}, requiresAuth: false);
   }
-
 
   Future<double> getCurrentPrice(String symbol) async {
     try {

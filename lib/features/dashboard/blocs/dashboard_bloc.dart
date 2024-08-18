@@ -24,17 +24,20 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final dailyProfitLoss = await _repository.getDailyProfitLoss();
       final weeklyProfitLoss = await _repository.getWeeklyProfitLoss();
       final monthlyProfitLoss = await _repository.getMonthlyProfitLoss();
+      final marketData = await _repository.getMarketData('BTCUSDT');
+      final selectedSymbol = 'BTCUSDT';
 
       emit(DashboardLoaded(
-        portfolio: portfolio,
-        recentTrades: recentTrades,
-        performanceData: performanceData,
-        activeStrategy: activeStrategy,
-        dailyChange: dailyChange,
-        dailyProfitLoss: dailyProfitLoss,
-        weeklyProfitLoss: weeklyProfitLoss,
-        monthlyProfitLoss: monthlyProfitLoss,
-      ));
+          portfolio: portfolio,
+          recentTrades: recentTrades,
+          performanceData: performanceData,
+          activeStrategy: activeStrategy,
+          dailyChange: dailyChange,
+          dailyProfitLoss: dailyProfitLoss,
+          weeklyProfitLoss: weeklyProfitLoss,
+          monthlyProfitLoss: monthlyProfitLoss,
+          marketData: marketData,
+          selectedSymbol: selectedSymbol));
     } catch (e) {
       emit(DashboardError(e.toString()));
     }

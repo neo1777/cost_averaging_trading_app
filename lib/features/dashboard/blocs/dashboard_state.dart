@@ -1,3 +1,4 @@
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:equatable/equatable.dart';
 import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
@@ -23,6 +24,8 @@ class DashboardLoaded extends DashboardState {
   final double dailyProfitLoss;
   final double weeklyProfitLoss;
   final double monthlyProfitLoss;
+  final List<Candle> marketData;
+  final String selectedSymbol;
 
   const DashboardLoaded({
     required this.portfolio,
@@ -33,6 +36,8 @@ class DashboardLoaded extends DashboardState {
     required this.dailyProfitLoss,
     required this.weeklyProfitLoss,
     required this.monthlyProfitLoss,
+    required this.marketData,
+    required this.selectedSymbol,
   });
 
   @override
@@ -45,6 +50,8 @@ class DashboardLoaded extends DashboardState {
         dailyProfitLoss,
         weeklyProfitLoss,
         monthlyProfitLoss,
+        marketData,
+        selectedSymbol,
       ];
 }
 

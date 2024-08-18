@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/backtesting_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
@@ -35,11 +34,7 @@ class AppProviders extends StatelessWidget {
           ),
         ),
         RepositoryProvider<DatabaseService>(
-          create: (context) {
-            final databaseService = DatabaseService();
-            _initializeDatabase(databaseService);
-            return databaseService;
-          },
+          create: (context) => DatabaseService(),
         ),
         RepositoryProvider<SecureStorageService>(
           create: (context) => SecureStorageService(),
@@ -57,6 +52,7 @@ class AppProviders extends StatelessWidget {
         ),
         RepositoryProvider<StrategyRepository>(
           create: (context) => StrategyRepository(
+            apiService: context.read<ApiService>(),
             databaseService: context.read<DatabaseService>(),
           ),
         ),
@@ -89,10 +85,8 @@ class AppProviders extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           BlocProvider<DashboardBloc>(
-            create: (context) => DashboardBloc(
-              context.read<DashboardRepository>(),
-              //context.read<StrategyRepository>(),
-            ),
+            create: (context) =>
+                DashboardBloc(context.read<DashboardRepository>()),
           ),
           BlocProvider<PortfolioBloc>(
             create: (context) =>
@@ -118,18 +112,5 @@ class AppProviders extends StatelessWidget {
         child: child,
       ),
     );
-  }
-
-  void _initializeDatabase(DatabaseService databaseService) {
-    databaseService.initDatabase().then((_) async {
-      bool isHealthy = await databaseService.isDatabaseHealthy();
-      if (isHealthy) {
-        await databaseService.performMaintenance();
-        await databaseService.checkAndCleanupOldData();
-        await databaseService.optimizeDatabasePerformance();
-      } else {
-        await databaseService.backupDatabase();
-      }
-    }).catchError((error) {});
   }
 }

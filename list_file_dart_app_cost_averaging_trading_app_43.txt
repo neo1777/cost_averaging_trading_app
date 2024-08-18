@@ -1,7 +1,37 @@
 ./lib
+├── candlestick
+│   ├── constant
+│   │   └── view_constants.dart
+│   ├── models
+│   │   ├── candle.dart
+│   │   ├── candle_sticks_style.dart
+│   │   ├── indicator.dart
+│   │   └── main_window_indicator.dart
+│   ├── utils
+│   │   ├── indicators
+│   │   │   ├── bollinger_bands_indicator.dart
+│   │   │   ├── moving_average_indicator.dart
+│   │   │   └── weighted_moving_average.dart
+│   │   └── helper_functions.dart
+│   ├── widgets
+│   │   ├── candle_info_text.dart
+│   │   ├── candle_stick_widget.dart
+│   │   ├── dash_line.dart
+│   │   ├── desktop_chart.dart
+│   │   ├── mainwindow_indicator_widget.dart
+│   │   ├── mobile_chart.dart
+│   │   ├── price_column.dart
+│   │   ├── time_row.dart
+│   │   ├── toolbar_action.dart
+│   │   ├── toolbar.dart
+│   │   ├── top_panel.dart
+│   │   └── volume_widget.dart
+│   └── candlesticks.dart
 ├── core
 │   ├── animations
 │   │   └── custom_animations.dart
+│   ├── config
+│   │   └── chart_config.dart
 │   ├── domain
 │   │   ├── entities
 │   │   │   ├── portfolio_entity.dart
@@ -41,7 +71,6 @@
 │   │   └── breakpoints.dart
 │   └── widgets
 │       ├── custom_button.dart
-│       ├── custom_candlestick_chart.dart
 │       ├── custom_card.dart
 │       ├── custom_text_field.dart
 │       └── shared_widgets.dart
@@ -64,6 +93,7 @@
 │   │       ├── pages
 │   │       │   └── dashboard_page.dart
 │   │       └── widgets
+│   │           ├── market_chart.dart
 │   │           ├── performance_chart.dart
 │   │           ├── portfolio_overview.dart
 │   │           └── recent_trades_widget.dart

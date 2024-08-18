@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -24,8 +25,6 @@ class ApiService {
       rethrow;
     }
   }
-
-  
 
   Stream<Map<String, dynamic>> getTickerStream(String symbol) {
     final wsUrl =
@@ -185,23 +184,13 @@ class ApiService {
     return await get('/api/v3/exchangeInfo', requiresAuth: false);
   }
 
-Future<List<List<dynamic>>> getKlines({
+  Future<List<List<dynamic>>> getKlines({
     required String symbol,
     required String interval,
     int? limit,
-    int? startTime,
-    int? endTime,
   }) async {
-    final queryParams = {
-      'symbol': symbol,
-      'interval': interval,
-      if (limit != null) 'limit': limit.toString(),
-      if (startTime != null) 'startTime': startTime.toString(),
-      if (endTime != null) 'endTime': endTime.toString(),
-    };
-
-    final uri = Uri.parse('$baseUrl/api/v3/klines')
-        .replace(queryParameters: queryParams);
+    final uri = Uri.parse(
+        '$baseUrl/klines?symbol=$symbol&interval=$interval${limit != null ? '&limit=$limit' : ''}');
     final response = await http.get(uri);
 
     if (response.statusCode == 200) {
@@ -209,6 +198,25 @@ Future<List<List<dynamic>>> getKlines({
     } else {
       throw Exception('Failed to load klines');
     }
+  }
+
+  Future<List<Candle>> getKlineData(String symbol, String interval) async {
+    final response = await get('/api/v3/klines', queryParams: {
+      'symbol': symbol,
+      'interval': interval,
+      'limit': '100',
+    });
+
+    return (response as List)
+        .map((item) => Candle(
+              date: DateTime.fromMillisecondsSinceEpoch(item[0]),
+              open: double.parse(item[1]),
+              high: double.parse(item[2]),
+              low: double.parse(item[3]),
+              close: double.parse(item[4]),
+              volume: double.parse(item[5]),
+            ))
+        .toList();
   }
 
   Stream<Map<String, dynamic>> getKlineStream(String symbol, String interval) {
@@ -220,11 +228,11 @@ Future<List<List<dynamic>>> getKlines({
       return jsonDecode(event);
     });
   }
+
   Future<Map<String, dynamic>> get24hrTickerPriceChange(String symbol) async {
     return await get('/api/v3/ticker/24hr',
         queryParams: {'symbol': symbol}, requiresAuth: false);
   }
-
 
   Future<double> getCurrentPrice(String symbol) async {
     try {

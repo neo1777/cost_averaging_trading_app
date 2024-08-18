@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:candlesticks/candlesticks.dart';
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';

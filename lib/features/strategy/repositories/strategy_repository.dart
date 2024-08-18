@@ -1,3 +1,5 @@
+import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
+import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
 import 'package:cost_averaging_trading_app/core/services/trading_service.dart';
 import 'package:cost_averaging_trading_app/features/strategy/models/strategy_parameters.dart';
@@ -5,9 +7,12 @@ import 'package:cost_averaging_trading_app/features/strategy/blocs/strategy_stat
 import 'package:cost_averaging_trading_app/core/models/trade.dart';
 
 class StrategyRepository {
+  final ApiService apiService;
+
   final DatabaseService databaseService;
 
   StrategyRepository({
+    required this.apiService,
     required this.databaseService,
   });
 
@@ -158,6 +163,25 @@ class StrategyRepository {
       }).toList();
     } catch (e) {
       throw Exception('Failed to get strategy chart data: $e');
+    }
+  }
+
+  Future<List<Candle>> getChartData(String symbol, String interval) async {
+    try {
+      final rawData =
+          await apiService.getKlines(symbol: symbol, interval: interval);
+      return rawData
+          .map((data) => Candle(
+                date: DateTime.fromMillisecondsSinceEpoch(data[0]),
+                open: double.parse(data[1]),
+                high: double.parse(data[2]),
+                low: double.parse(data[3]),
+                close: double.parse(data[4]),
+                volume: double.parse(data[5]),
+              ))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch chart data: $e');
     }
   }
 }
