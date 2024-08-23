@@ -2,15 +2,15 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '.././constant/view_constants.dart';
-import '.././models/main_window_indicator.dart';
-import '.././utils/helper_functions.dart';
-import '.././widgets/candle_stick_widget.dart';
-import '.././widgets/mainwindow_indicator_widget.dart';
-import '.././widgets/price_column.dart';
-import '.././widgets/time_row.dart';
-import '.././widgets/top_panel.dart';
-import '.././widgets/volume_widget.dart';
+import '../constant/view_constants.dart';
+import '../models/main_window_indicator.dart';
+import '../utils/helper_functions.dart';
+import 'candle_stick_widget.dart';
+import 'mainwindow_indicator_widget.dart';
+import 'price_column.dart';
+import 'time_row.dart';
+import 'top_panel.dart';
+import 'volume_widget.dart';
 import '../candlesticks.dart';
 import '../models/candle.dart';
 import '../models/candle_sticks_style.dart';

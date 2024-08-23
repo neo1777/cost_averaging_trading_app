@@ -2,9 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '.././constant/view_constants.dart';
-import '.././models/candle.dart';
-import '.././models/candle_sticks_style.dart';
+import '../constant/view_constants.dart';
+import '../models/candle.dart';
+import '../models/candle_sticks_style.dart';
 
 class TimeRow extends StatefulWidget {
   final List<Candle> candles;
@@ -15,14 +15,14 @@ class TimeRow extends StatefulWidget {
   final CandleSticksStyle style;
 
   const TimeRow({
-    super.key,
+    Key? key,
     required this.candles,
     required this.candleWidth,
     this.indicatorX,
     required this.indicatorTime,
     required this.index,
     required this.style,
-  });
+  }) : super(key: key);
 
   @override
   State<TimeRow> createState() => _TimeRowState();

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '.././models/candle.dart';
-import '.././models/candle_sticks_style.dart';
-import '.././models/indicator.dart';
-import '.././widgets/candle_info_text.dart';
+import '../models/candle.dart';
+import '../models/candle_sticks_style.dart';
+import '../models/indicator.dart';
+import 'candle_info_text.dart';
 
 class TopPanel extends StatefulWidget {
   final Candle? currentCandle;
@@ -14,14 +14,14 @@ class TopPanel extends StatefulWidget {
   final void Function(String indicatorName)? onRemoveIndicator;
   final CandleSticksStyle style;
   const TopPanel({
-    super.key,
+    Key? key,
     required this.currentCandle,
     required this.indicators,
     required this.toggleIndicatorVisibility,
     required this.unvisibleIndicators,
     required this.onRemoveIndicator,
     required this.style,
-  });
+  }) : super(key: key);
 
   @override
   State<TopPanel> createState() => _TopPanelState();
@@ -32,9 +32,10 @@ class _PanelButton extends StatelessWidget {
 
   final Color borderColor;
   const _PanelButton({
+    Key? key,
     required this.child,
     required this.borderColor,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

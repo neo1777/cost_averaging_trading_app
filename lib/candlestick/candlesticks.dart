@@ -56,7 +56,7 @@ class Candlesticks extends StatefulWidget {
     this.indicators,
     this.onRemoveIndicator,
     this.style,
-  })  : assert(candles.length == 0 || candles.length > 1,
+  }) : assert(candles.length == 0 || candles.length > 1,
             "Please provide at least 2 candles");
 
   @override
@@ -139,7 +139,7 @@ class _CandlesticksState extends State<Candlesticks> {
         else
           Expanded(
             child: TweenAnimationBuilder(
-              tween: Tween(begin: 6.toDouble(), end: candleWidth),
+              tween: Tween(begin: 6.0, end: candleWidth),
               duration: const Duration(milliseconds: 120),
               builder: (_, double width, __) {
                 if (kIsWeb ||
@@ -189,6 +189,7 @@ class _CandlesticksState extends State<Candlesticks> {
                     index: index,
                   );
                 } else {
+                  print('view mobile chart');
                   return MobileChart(
                     style: style,
                     onRemoveIndicator: widget.onRemoveIndicator,

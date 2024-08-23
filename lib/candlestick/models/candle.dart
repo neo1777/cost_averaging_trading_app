@@ -34,11 +34,27 @@ class Candle {
     required this.volume,
   });
 
-  Candle.fromJson(List<dynamic> json)
-      : date = DateTime.fromMillisecondsSinceEpoch(json[0]),
-        high = double.parse(json[2]),
-        low = double.parse(json[3]),
-        open = double.parse(json[1]),
-        close = double.parse(json[4]),
-        volume = double.parse(json[5]);
+  factory Candle.fromJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      return Candle(
+        date: DateTime.fromMillisecondsSinceEpoch(json['t'] as int),
+        high: double.parse(json['h']),
+        low: double.parse(json['l']),
+        open: double.parse(json['o']),
+        close: double.parse(json['c']),
+        volume: double.parse(json['v']),
+      );
+    } else if (json is List<dynamic>) {
+      return Candle(
+        date: DateTime.fromMillisecondsSinceEpoch(json[0] as int),
+        open: double.parse(json[1]),
+        high: double.parse(json[2]),
+        low: double.parse(json[3]),
+        close: double.parse(json[4]),
+        volume: double.parse(json[5]),
+      );
+    } else {
+      throw const FormatException('Invalid JSON format for Candle');
+    }
+  }
 }

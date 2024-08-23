@@ -8,47 +8,61 @@ class RecentTradesWidget extends StatelessWidget {
   final VoidCallback onViewAllTrades;
 
   const RecentTradesWidget({
-    super.key,
+    Key? key,
     required this.trades,
     required this.onViewAllTrades,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return CustomCard(
-      title: 'Recent Trades',
-      child: Column(
-        children: [
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: trades.length > 5 ? 5 : trades.length,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: ListView.builder(
+            itemCount: trades.length,
             itemBuilder: (context, index) {
               final trade = trades[index];
               return ListTile(
                 leading: Icon(
-                  trade.type == CoreTradeType.buy ? Icons.arrow_downward : Icons.arrow_upward,
-                  color: trade.type == CoreTradeType.buy ? Colors.green : Colors.red,
+                  trade.type == CoreTradeType.buy
+                      ? Icons.arrow_downward
+                      : Icons.arrow_upward,
+                  color: trade.type == CoreTradeType.buy
+                      ? Colors.green
+                      : Colors.red,
                 ),
-                title: Text('${trade.type.name.toUpperCase()} ${trade.amount} ${trade.symbol}'),
-                subtitle: Text('Price: ${trade.price} | ${DateFormat.yMd().add_Hms().format(trade.timestamp)}'),
+                title: Text(
+                  '${trade.type.name.toUpperCase()} ${trade.amount.toStringAsFixed(5)} ${trade.symbol}',
+                  style: TextStyle(color: Colors.white),
+                ),
+                subtitle: Text(
+                  'Price: ${trade.price.toStringAsFixed(2)} | ${DateFormat.yMd().add_Hms().format(trade.timestamp)}',
+                  style: TextStyle(color: Colors.grey),
+                ),
                 trailing: Text(
                   '${trade.type == CoreTradeType.buy ? '-' : '+'}${(trade.amount * trade.price).toStringAsFixed(2)}',
                   style: TextStyle(
-                    color: trade.type == CoreTradeType.buy ? Colors.red : Colors.green,
+                    color: trade.type == CoreTradeType.buy
+                        ? Colors.red
+                        : Colors.green,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               );
             },
           ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: onViewAllTrades,
-            child: const Text('View All Trades'),
+        ),
+        SizedBox(height: 8),
+        ElevatedButton(
+          onPressed: onViewAllTrades,
+          child: Text('View All Trades'),
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.blue,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '.././constant/view_constants.dart';
-import '.././models/candle.dart';
-import '.././models/candle_sticks_style.dart';
-import '.././utils/helper_functions.dart';
+import '../constant/view_constants.dart';
+import '../models/candle.dart';
+import '../models/candle_sticks_style.dart';
+import '../utils/helper_functions.dart';
 
 class PriceColumn extends StatefulWidget {
   final double low;
@@ -15,7 +15,7 @@ class PriceColumn extends StatefulWidget {
   final void Function(double) onScale;
   final CandleSticksStyle style;
   const PriceColumn({
-    super.key,
+    Key? key,
     required this.low,
     required this.high,
     required this.width,
@@ -23,7 +23,7 @@ class PriceColumn extends StatefulWidget {
     required this.lastCandle,
     required this.onScale,
     required this.style,
-  });
+  }) : super(key: key);
 
   @override
   State<PriceColumn> createState() => _PriceColumnState();

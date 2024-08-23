@@ -19,7 +19,7 @@ class Routes {
     switch (setting.name) {
       case dashboard:
         return MaterialPageRoute(
-            builder: (_) => const MainLayout(child: DashboardPage()));
+            builder: (_) => MainLayout(child: DashboardPage()));
       case portfolio:
         return MaterialPageRoute(
             builder: (_) => const MainLayout(child: PortfolioPage()));

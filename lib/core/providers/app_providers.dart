@@ -1,3 +1,5 @@
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_bloc.dart';
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -107,6 +109,13 @@ class AppProviders extends StatelessWidget {
           BlocProvider<SettingsBloc>(
             create: (context) =>
                 SettingsBloc(context.read<SettingsRepository>()),
+          ),
+          BlocProvider<ChartBloc>(
+            create: (context) => ChartBloc(
+              symbol: 'BTCUSDT', // o qualsiasi simbolo predefinito
+              apiService: context.read<ApiService>(),
+            )..add(
+                LoadChartData()), // Aggiungi questo per caricare i dati immediatamente
           ),
         ],
         child: child,

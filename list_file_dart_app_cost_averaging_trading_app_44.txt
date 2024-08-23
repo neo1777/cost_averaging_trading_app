@@ -93,6 +93,7 @@
 │   │       ├── pages
 │   │       │   └── dashboard_page.dart
 │   │       └── widgets
+│   │           ├── market_chart.dart
 │   │           ├── performance_chart.dart
 │   │           ├── portfolio_overview.dart
 │   │           └── recent_trades_widget.dart

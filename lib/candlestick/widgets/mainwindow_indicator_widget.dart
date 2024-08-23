@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '.././models/main_window_indicator.dart';
+import '../models/main_window_indicator.dart';
 
 class MainWindowIndicatorRenderObject extends RenderBox {
   late List<IndicatorComponentData> _indicatorDatas;

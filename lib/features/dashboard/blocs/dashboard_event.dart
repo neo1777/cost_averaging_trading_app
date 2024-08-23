@@ -21,3 +21,4 @@ class ChangeSymbol extends DashboardEvent {
 
   List<Object> get props => [symbol];
 }
+

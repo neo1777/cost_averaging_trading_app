@@ -1,10 +1,13 @@
 ./lib/main.dart:
 ```
+// ignore_for_file: avoid_print
+
 import 'package:cost_averaging_trading_app/core/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cost_averaging_trading_app/app.dart';
 import 'package:cost_averaging_trading_app/core/providers/app_providers.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:logging/logging.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -22,6 +25,10 @@ void main() async {
   final databaseService = DatabaseService();
   await databaseService.initDatabase();
 
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.time}: ${record.message}');
+  });
   runApp(
     const AppProviders(
       child: App(),
@@ -656,10 +663,10 @@ class TimeRow extends StatefulWidget {
   });
 
   @override
-  State<TimeRow> createState() => _TimeRowState();
+  TimeRowState createState() => TimeRowState();
 }
 
-class _TimeRowState extends State<TimeRow> {
+class TimeRowState extends State<TimeRow> {
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -734,12 +741,10 @@ class _TimeRowState extends State<TimeRow> {
     super.didUpdateWidget(oldWidget);
   }
 
-  /// Fomats number as 2 digit integer
   String numberFormat(int value) {
     return "${value < 10 ? 0 : ""}$value";
   }
 
-  /// Hour/minute text widget
   Text _hourMinuteText(DateTime time, Color color) {
     return Text(
       "${numberFormat(time.hour)}:${numberFormat(time.minute)}",
@@ -750,7 +755,6 @@ class _TimeRowState extends State<TimeRow> {
     );
   }
 
-  /// Day/month text widget
   Text _monthDayText(DateTime time, Color color) {
     return Text(
       "${numberFormat(time.month)}/${numberFormat(time.day)}",
@@ -761,7 +765,6 @@ class _TimeRowState extends State<TimeRow> {
     );
   }
 
-  /// Calculates number of candles between two time indicator
   int _stepCalculator() {
     if (widget.candleWidth < 3) {
       return 31;
@@ -774,7 +777,6 @@ class _TimeRowState extends State<TimeRow> {
     }
   }
 
-  /// Calculates [DateTime] of a given candle index
   DateTime _timeCalculator(int step, int index, Duration dif) {
     int candleNumber = (step + 1) ~/ 2 - 10 + index * step + -1;
     DateTime? time;
@@ -869,6 +871,7 @@ class CandleStickRenderObject extends RenderBox {
     _high = high;
     _bearColor = bearColor;
     _bullColor = bullColor;
+    _close = 0.0; // Or set it appropriately
   }
 
   @override
@@ -938,7 +941,8 @@ class CandleStickWidget extends LeafRenderObjectWidget {
   final Color bullColor;
   final Color bearColor;
 
-  const CandleStickWidget({super.key, 
+  const CandleStickWidget({
+    super.key,
     required this.candles,
     required this.index,
     required this.candleWidth,
@@ -998,7 +1002,6 @@ class CandleStickWidget extends LeafRenderObjectWidget {
 ./lib/candlestick/widgets/price_column.dart:
 ```
 import 'package:flutter/material.dart';
-
 import '.././constant/view_constants.dart';
 import '.././models/candle.dart';
 import '.././models/candle_sticks_style.dart';
@@ -1006,13 +1009,13 @@ import '.././utils/helper_functions.dart';
 
 class PriceColumn extends StatefulWidget {
   final double low;
-
   final double high;
   final double width;
   final double chartHeight;
   final Candle lastCandle;
   final void Function(double) onScale;
   final CandleSticksStyle style;
+
   const PriceColumn({
     super.key,
     required this.low,
@@ -1025,10 +1028,10 @@ class PriceColumn extends StatefulWidget {
   });
 
   @override
-  State<PriceColumn> createState() => _PriceColumnState();
+  PriceColumnState createState() => PriceColumnState();
 }
 
-class _PriceColumnState extends State<PriceColumn> {
+class PriceColumnState extends State<PriceColumn> {
   ScrollController scrollController = ScrollController();
 
   @override
@@ -1130,7 +1133,6 @@ class _PriceColumnState extends State<PriceColumn> {
         MAIN_CHART_VERTICAL_PADDING;
   }
 }
-
 ```
 
 ./lib/candlestick/widgets/candle_info_text.dart:
@@ -1210,10 +1212,10 @@ class CandleInfoText extends StatelessWidget {
 import 'package:flutter/material.dart';
 
 class ToolBar extends StatelessWidget {
-  const ToolBar({super.key, required this.children, required this.color});
-
   final List<Widget> children;
   final Color color;
+
+  const ToolBar({super.key, required this.children, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1228,7 +1230,6 @@ class ToolBar extends StatelessWidget {
     );
   }
 }
-
 ```
 
 ./lib/candlestick/widgets/toolbar_action.dart:
@@ -1519,6 +1520,7 @@ class _DesktopChartState extends State<DesktopChart> {
   bool showHoverIndicator = true;
   double? manualScaleHigh;
   double? manualScaleLow;
+  bool hasReachedEnd = false; // Dichiarazione della variabile
 
   @override
   Widget build(BuildContext context) {
@@ -1534,11 +1536,17 @@ class _DesktopChartState extends State<DesktopChart> {
             maxWidth ~/ widget.candleWidth + widget.index,
             widget.candles.length - 1);
 
-        if (candlesEndIndex == widget.candles.length - 1) {
-          Future(() {
-            widget.onReachEnd();
-          });
+        // Chiama onReachEnd solo una volta quando raggiungi la fine
+        if (!hasReachedEnd && candlesEndIndex == widget.candles.length - 1) {
+          hasReachedEnd = true;
+          widget.onReachEnd();
         }
+
+        // if (candlesEndIndex == widget.candles.length - 1) {
+        //   Future(() {
+        //     widget.onReachEnd();
+        //   });
+        // }
 
         List<Candle> inRangeCandles = widget.candles
             .getRange(candlesStartIndex, candlesEndIndex + 1)
@@ -1550,11 +1558,14 @@ class _DesktopChartState extends State<DesktopChart> {
           candlesHighPrice = manualScaleHigh!;
           candlesLowPrice = manualScaleLow!;
         } else if (widget.chartAdjust == ChartAdjust.visibleRange) {
+          int validCandlesEndIndex = min(
+              candlesEndIndex, widget.mainWindowDataContainer.highs.length - 1);
+
           candlesHighPrice = widget.mainWindowDataContainer.highs
-              .getRange(candlesStartIndex, candlesEndIndex + 1)
+              .getRange(candlesStartIndex, validCandlesEndIndex + 1)
               .reduce(max);
           candlesLowPrice = widget.mainWindowDataContainer.lows
-              .getRange(candlesStartIndex, candlesEndIndex + 1)
+              .getRange(candlesStartIndex, validCandlesEndIndex + 1)
               .reduce(min);
         } else if (widget.chartAdjust == ChartAdjust.fullRange) {
           candlesHighPrice = widget.mainWindowDataContainer.highs.reduce(max);
@@ -2139,6 +2150,7 @@ class _CandlesticksState extends State<Candlesticks> {
 
   MainWindowDataContainer? mainWindowDataContainer;
 
+  
   @override
   Widget build(BuildContext context) {
     final style = widget.style ??
@@ -2191,7 +2203,7 @@ class _CandlesticksState extends State<Candlesticks> {
         else
           Expanded(
             child: TweenAnimationBuilder(
-              tween: Tween(begin: 6.toDouble(), end: candleWidth),
+              tween: Tween(begin: 6.0, end: candleWidth),
               duration: const Duration(milliseconds: 120),
               builder: (_, double width, __) {
                 if (kIsWeb ||
@@ -2378,13 +2390,29 @@ class Candle {
     required this.volume,
   });
 
-  Candle.fromJson(List<dynamic> json)
-      : date = DateTime.fromMillisecondsSinceEpoch(json[0]),
-        high = double.parse(json[2]),
-        low = double.parse(json[3]),
-        open = double.parse(json[1]),
-        close = double.parse(json[4]),
-        volume = double.parse(json[5]);
+  factory Candle.fromJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      return Candle(
+        date: DateTime.fromMillisecondsSinceEpoch(json['t'] as int),
+        high: double.parse(json['h']),
+        low: double.parse(json['l']),
+        open: double.parse(json['o']),
+        close: double.parse(json['c']),
+        volume: double.parse(json['v']),
+      );
+    } else if (json is List<dynamic>) {
+      return Candle(
+        date: DateTime.fromMillisecondsSinceEpoch(json[0] as int),
+        open: double.parse(json[1]),
+        high: double.parse(json[2]),
+        low: double.parse(json[3]),
+        close: double.parse(json[4]),
+        volume: double.parse(json[5]),
+      );
+    } else {
+      throw const FormatException('Invalid JSON format for Candle');
+    }
+  }
 }
 
 ```
@@ -5942,6 +5970,15 @@ class ChangeInterval extends ChartEvent {
   List<Object> get props => [interval];
 }
 
+class ChangeSymbol extends ChartEvent {
+  final String symbol;
+
+  const ChangeSymbol(this.symbol);
+
+  @override
+  List<Object> get props => [symbol];
+}
+
 class ToggleOrderMarkers extends ChartEvent {}
 
 class UpdateTicker extends ChartEvent {
@@ -5951,6 +5988,65 @@ class UpdateTicker extends ChartEvent {
   @override
   List<Object> get props => [tickerData];
 }
+
+class ZoomIn extends ChartEvent {}
+
+class ZoomOut extends ChartEvent {}
+
+class ResetZoom extends ChartEvent {}
+
+class PanLeft extends ChartEvent {}
+
+class PanRight extends ChartEvent {}
+
+class ToggleVolume extends ChartEvent {}
+
+class ToggleFullScreen extends ChartEvent {}
+
+class AddIndicator extends ChartEvent {
+  final String indicatorType;
+  final Map<String, dynamic> parameters;
+
+  const AddIndicator(this.indicatorType, this.parameters);
+
+  @override
+  List<Object> get props => [indicatorType, parameters];
+}
+
+class RemoveIndicator extends ChartEvent {
+  final String indicatorId;
+
+  const RemoveIndicator(this.indicatorId);
+
+  @override
+  List<Object> get props => [indicatorId];
+}
+
+class UpdateIndicatorSettings extends ChartEvent {
+  final String indicatorId;
+  final Map<String, dynamic> newSettings;
+
+  const UpdateIndicatorSettings(this.indicatorId, this.newSettings);
+
+  @override
+  List<Object> get props => [indicatorId, newSettings];
+}
+
+class LoadMoreCandles extends ChartEvent {
+  final String symbol;
+  final String interval;
+  final int endTime;
+
+  const LoadMoreCandles({
+    required this.symbol,
+    required this.interval,
+    required this.endTime,
+  });
+
+  @override
+  List<Object> get props => [symbol, interval, endTime];
+}
+
 ```
 
 ./lib/features/chart/blocs/chart_state.dart:
@@ -5971,15 +6067,17 @@ class ChartLoaded extends ChartState {
   final List<Candle> candles;
   final String interval;
   final bool showOrderMarkers;
+  final String symbol;
 
   const ChartLoaded({
     required this.candles,
     required this.interval,
     required this.showOrderMarkers,
+    required this.symbol,
   });
 
   @override
-  List<Object> get props => [candles, interval, showOrderMarkers];
+  List<Object> get props => [candles, interval, showOrderMarkers, symbol];
 }
 
 class ChartError extends ChartState {
@@ -5995,9 +6093,13 @@ class ChartError extends ChartState {
 
 ./lib/features/chart/blocs/chart_bloc.dart:
 ```
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:logging/logging.dart';
+
 import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_state.dart';
@@ -6005,7 +6107,8 @@ import 'package:cost_averaging_trading_app/features/chart/blocs/chart_state.dart
 class ChartBloc extends Bloc<ChartEvent, ChartState> {
   final ApiService _apiService;
   final String symbol;
-  StreamSubscription<Map<String, dynamic>>? _klineSubscription;
+  StreamSubscription<dynamic>? _klineSubscription;
+
   static const List<String> intervals = [
     '1m',
     '3m',
@@ -6023,6 +6126,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     '1w',
     '1M'
   ];
+  final Logger _logger = Logger('ChartBloc');
 
   ChartBloc({required this.symbol, required ApiService apiService})
       : _apiService = apiService,
@@ -6030,18 +6134,34 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     on<LoadChartData>(_onLoadChartData);
     on<UpdateChartData>(_onUpdateChartData);
     on<ChangeInterval>(_onChangeInterval);
+    on<ChangeSymbol>(_onChangeSymbol);
     on<ToggleOrderMarkers>(_onToggleOrderMarkers);
+    on<LoadMoreCandles>(_onLoadMoreCandles);
+    add(LoadChartData());
   }
 
   Future<void> _onLoadChartData(
-      LoadChartData event, Emitter<ChartState> emit) async {
+    LoadChartData event,
+    Emitter<ChartState> emit,
+  ) async {
     try {
       emit(ChartLoading());
       final candles = await _fetchInitialCandles();
-      _subscribeToKlineUpdates('1m');
-      emit(ChartLoaded(
-          candles: candles, interval: '1m', showOrderMarkers: true));
+      print('Fetched ${candles.length} candles'); // Aggiungi questo log
+      if (candles.isNotEmpty) {
+        _subscribeToKlineUpdates('1m');
+        emit(ChartLoaded(
+          candles: candles,
+          interval: '1m',
+          showOrderMarkers: true,
+          symbol: symbol,
+        ));
+        print('Emitted ChartLoaded state'); // Aggiungi questo log
+      } else {
+        emit(const ChartError(message: 'No candles data available'));
+      }
     } catch (e) {
+      print('Error in _onLoadChartData: $e'); // Aggiungi questo log
       emit(ChartError(message: e.toString()));
     }
   }
@@ -6056,8 +6176,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           updatedCandles[0].open == event.latestCandle.open) {
         // Update last candle
         updatedCandles[0] = event.latestCandle;
-      } else if (event.latestCandle.date.difference(updatedCandles[0].date) ==
-          updatedCandles[0].date.difference(updatedCandles[1].date)) {
+      } else {
         // Add new candle
         updatedCandles.insert(0, event.latestCandle);
         if (updatedCandles.length > 100) {
@@ -6069,6 +6188,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         candles: updatedCandles,
         interval: currentState.interval,
         showOrderMarkers: currentState.showOrderMarkers,
+        symbol: currentState.symbol,
       ));
     }
   }
@@ -6077,15 +6197,45 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       ChangeInterval event, Emitter<ChartState> emit) async {
     try {
       emit(ChartLoading());
-      final candles = await _fetchInitialCandles(interval: event.interval);
+      final candles =
+          await _fetchInitialCandles(interval: event.interval, symbol: symbol);
+      if (candles.isEmpty) {
+        emit(const ChartError(message: 'No data available for this interval'));
+        return;
+      }
       _subscribeToKlineUpdates(event.interval);
       emit(ChartLoaded(
         candles: candles,
         interval: event.interval,
-        showOrderMarkers: (state as ChartLoaded).showOrderMarkers,
+        showOrderMarkers: true, // o false, a seconda delle tue esigenze
+        symbol: symbol,
       ));
     } catch (e) {
-      emit(ChartError(message: e.toString()));
+      _logger.severe('Error changing interval: $e');
+      emit(ChartError(message: 'Failed to change interval: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onChangeSymbol(
+      ChangeSymbol event, Emitter<ChartState> emit) async {
+    try {
+      emit(ChartLoading());
+      final candles =
+          await _fetchInitialCandles(symbol: event.symbol, interval: '1m');
+      if (candles.isEmpty) {
+        emit(const ChartError(message: 'No data available for this symbol'));
+        return;
+      }
+      _subscribeToKlineUpdates('1m', symbol: event.symbol);
+      emit(ChartLoaded(
+        candles: candles,
+        interval: '1m',
+        showOrderMarkers: true, // o false, a seconda delle tue esigenze
+        symbol: event.symbol,
+      ));
+    } catch (e) {
+      _logger.severe('Error changing symbol: $e');
+      emit(ChartError(message: 'Failed to change symbol: ${e.toString()}'));
     }
   }
 
@@ -6097,55 +6247,85 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         candles: currentState.candles,
         interval: currentState.interval,
         showOrderMarkers: !currentState.showOrderMarkers,
+        symbol: currentState.symbol,
       ));
     }
   }
 
-  Future<List<Candle>> _fetchInitialCandles({String interval = '1m'}) async {
-    final klines = await _apiService.getKlines(
-      symbol: symbol,
-      interval: interval,
-      limit: 100,
-    );
-    return klines
-        .map((kline) {
-          try {
-            return Candle(
-              date: DateTime.fromMillisecondsSinceEpoch(kline[0]),
-              high: double.parse(kline[2]),
-              low: double.parse(kline[3]),
-              open: double.parse(kline[1]),
-              close: double.parse(kline[4]),
-              volume: double.parse(kline[5]),
-            );
-          } catch (e) {
-            return null;
-          }
-        })
-        .where((candle) => candle != null)
-        .cast<Candle>()
-        .toList()
-        .reversed
-        .toList();
+  Future<List<Candle>> _fetchInitialCandles(
+      {String? interval, String? symbol}) async {
+    try {
+      final klines = await _apiService.getKlines(
+        symbol: symbol ?? this.symbol,
+        interval: interval ?? '1m',
+        limit: 100, // Aumentiamo il limite per avere più dati
+      );
+      return klines.map((kline) => Candle.fromJson(kline)).toList();
+    } catch (e) {
+      _logger.severe('Error fetching initial candles: $e');
+      return []; // Ritorniamo una lista vuota in caso di errore
+    }
   }
 
-  void _subscribeToKlineUpdates(String interval) {
+  void _subscribeToKlineUpdates(String interval, {String? symbol}) {
     _klineSubscription?.cancel();
-    _klineSubscription =
-        _apiService.getKlineStream(symbol, interval).listen((event) {
-      if (event['e'] == 'kline') {
-        final kline = event['k'];
-        final candle = Candle(
-          date: DateTime.fromMillisecondsSinceEpoch(kline['t']),
-          high: double.parse(kline['h']),
-          low: double.parse(kline['l']),
-          open: double.parse(kline['o']),
-          close: double.parse(kline['c']),
-          volume: double.parse(kline['v']),
-        );
+    _klineSubscription = _apiService
+        .getKlineStream(symbol ?? this.symbol, interval)
+        .listen((event) {
+      _logger.info('Received kline event: $event');
+      try {
+        Candle candle;
+        if (event is Map<String, dynamic>) {
+          if (event['e'] == 'kline') {
+            candle = Candle.fromJson(event['k']);
+          } else {
+            _logger.warning('Unexpected event type: ${event['e']}');
+            return;
+          }
+        } else if (event is List<dynamic>) {
+          candle = Candle.fromJson(event);
+        } else {
+          _logger.warning('Unexpected event type: ${event.runtimeType}');
+          return;
+        }
         add(UpdateChartData(latestCandle: candle));
+      } catch (e, stackTrace) {
+        _logger.severe('Error processing kline data', e, stackTrace);
       }
     });
+  }
+
+  Future<void> _onLoadMoreCandles(
+    LoadMoreCandles event,
+    Emitter<ChartState> emit,
+  ) async {
+    if (state is ChartLoaded) {
+      final currentState = state as ChartLoaded;
+      try {
+        final newCandles = await _apiService.getKlines(
+          symbol: event.symbol,
+          interval: event.interval,
+          // Usa 'endTime' come parametro opzionale se disponibile nell'ApiService
+          // Altrimenti, potresti dover usare 'limit' e calcolare il timestamp di inizio
+          limit: 100,
+        );
+
+        final updatedCandles = [
+          ...currentState.candles,
+          ...newCandles.map((kline) => Candle.fromJson(kline)),
+        ];
+
+        emit(ChartLoaded(
+          candles: updatedCandles,
+          interval: currentState.interval,
+          showOrderMarkers: currentState.showOrderMarkers,
+          symbol: currentState.symbol,
+        ));
+      } catch (e) {
+        emit(ChartError(
+            message: 'Failed to load more candles: ${e.toString()}'));
+      }
+    }
   }
 
   @override
@@ -7156,49 +7336,143 @@ class PortfolioOverview extends StatelessWidget {
 
 ./lib/features/dashboard/ui/widgets/market_chart.dart:
 ```
-import 'package:cost_averaging_trading_app/candlestick/candlesticks.dart';
-import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
+// ignore_for_file: avoid_print
+
 import 'package:flutter/material.dart';
+import 'package:cost_averaging_trading_app/candlestick/candlesticks.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_bloc.dart';
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_state.dart';
 
 class MarketChart extends StatelessWidget {
-  final List<Candle> candles;
-  final String symbol;
-  final Function(String) onSymbolChanged;
+  final List<String> intervals = [
+    '1m',
+    '3m',
+    '5m',
+    '15m',
+    '30m',
+    '1h',
+    '2h',
+    '4h',
+    '6h',
+    '8h',
+    '12h',
+    '1d',
+    '3d',
+    '1w',
+    '1M'
+  ];
 
-  const MarketChart({
-    Key? key,
-    required this.candles,
-    required this.symbol,
-    required this.onSymbolChanged,
-  }) : super(key: key);
+  MarketChart({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        DropdownButton<String>(
-          value: symbol,
-          items: ['ETHBTC', 'BTCUSDT', 'ETHUSDT'].map((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList(),
-          onChanged: (String? newValue) {
-            if (newValue != null) {
-              onSymbolChanged(newValue);
-            }
-          },
-        ),
-        Expanded(
-          child: Candlesticks(
-            candles: candles,
-          ),
-        ),
-      ],
+    return BlocBuilder<ChartBloc, ChartState>(
+      builder: (context, state) {
+        if (state is ChartLoaded) {
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildSymbolSelector(context, state),
+                _buildIntervalSelector(context, state),
+                _buildCandlestickChart(context, state),
+                _buildChartInfo(state),
+              ],
+            ),
+          );
+        } else if (state is ChartLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is ChartError) {
+          return Center(child: Text(state.message));
+        } else {
+          return const Center(child: Text('Unknown state'));
+        }
+      },
+    );
+  }
+
+  Widget _buildSymbolSelector(BuildContext context, ChartLoaded state) {
+    return DropdownButton<String>(
+      value: state.symbol,
+      items: [
+        'BTCUSDT',
+        'ETHBTC',
+        'LTCBTC', /* ... altri simboli ... */
+      ].map((String value) {
+        return DropdownMenuItem<String>(
+          value: value,
+          child: Text(value),
+        );
+      }).toList(),
+      onChanged: (String? newValue) {
+        if (newValue != null) {
+          context.read<ChartBloc>().add(ChangeSymbol(newValue));
+        }
+      },
+    );
+  }
+
+  Widget _buildIntervalSelector(BuildContext context, ChartLoaded state) {
+    return DropdownButton<String>(
+      value: state.interval,
+      items: intervals.map((String value) {
+        return DropdownMenuItem<String>(
+          value: value,
+          child: Text(value),
+        );
+      }).toList(),
+      onChanged: (String? newValue) {
+        if (newValue != null) {
+          context.read<ChartBloc>().add(ChangeInterval(newValue));
+        }
+      },
+    );
+  }
+
+  Widget _buildCandlestickChart(BuildContext context, ChartLoaded state) {
+    if (state.candles.isEmpty) {
+      return const Center(child: Text('No candle data available'));
+    }
+    return SizedBox(
+      height: 400, // Imposta un'altezza fissa o usa un valore relativo
+      child: Candlesticks(
+        candles: state.candles,
+        onLoadMoreCandles: () async {
+          final oldestCandle = state.candles.last;
+          final ChartBloc chartBloc = context.read<ChartBloc>();
+
+          chartBloc.add(LoadMoreCandles(
+            symbol: state.symbol,
+            interval: state.interval,
+            endTime: oldestCandle.date.millisecondsSinceEpoch,
+          ));
+
+          await Future.delayed(const Duration(seconds: 1));
+        },
+      ),
+    );
+  }
+
+  Widget _buildChartInfo(ChartLoaded state) {
+    final lastCandle = state.candles.isNotEmpty ? state.candles.first : null;
+    if (lastCandle == null) return Container();
+
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('O: ${lastCandle.open.toStringAsFixed(2)}'),
+          Text('H: ${lastCandle.high.toStringAsFixed(2)}'),
+          Text('L: ${lastCandle.low.toStringAsFixed(2)}'),
+          Text('C: ${lastCandle.close.toStringAsFixed(2)}'),
+        ],
+      ),
     );
   }
 }
+
 ```
 
 ./lib/features/dashboard/ui/widgets/recent_trades_widget.dart:
@@ -7396,14 +7670,8 @@ class DashboardPage extends StatelessWidget {
             Text('Market Chart', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             SizedBox(
-              height: 300,
-              child: MarketChart(
-                candles: state.marketData,
-                symbol: state.selectedSymbol,
-                onSymbolChanged: (String symbol) {
-                  context.read<DashboardBloc>().add(ChangeSymbol(symbol));
-                },
-              ),
+              height: 400,
+              child: MarketChart(),
             ),
           ],
         ),
@@ -7425,7 +7693,6 @@ class DashboardPage extends StatelessWidget {
     );
   }
 }
-
 ```
 
 ./lib/features/dashboard/blocs/dashboard_event.dart:
@@ -7453,6 +7720,7 @@ class ChangeSymbol extends DashboardEvent {
 
   List<Object> get props => [symbol];
 }
+
 
 ```
 
@@ -7555,7 +7823,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final weeklyProfitLoss = await _repository.getWeeklyProfitLoss();
       final monthlyProfitLoss = await _repository.getMonthlyProfitLoss();
       final marketData = await _repository.getMarketData('BTCUSDT');
-      final selectedSymbol = 'BTCUSDT';
+      const selectedSymbol = 'BTCUSDT';
 
       emit(DashboardLoaded(
           portfolio: portfolio,
@@ -8760,6 +9028,8 @@ class PortfolioEntity extends Equatable {
 
 ./lib/core/providers/app_providers.dart:
 ```
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_bloc.dart';
+import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8869,6 +9139,13 @@ class AppProviders extends StatelessWidget {
           BlocProvider<SettingsBloc>(
             create: (context) =>
                 SettingsBloc(context.read<SettingsRepository>()),
+          ),
+          BlocProvider<ChartBloc>(
+            create: (context) => ChartBloc(
+              symbol: 'BTCUSDT', // o qualsiasi simbolo predefinito
+              apiService: context.read<ApiService>(),
+            )..add(
+                LoadChartData()), // Aggiungi questo per caricare i dati immediatamente
           ),
         ],
         child: child,
@@ -9692,6 +9969,8 @@ class BacktestPerformance {
 
 ./lib/core/services/api_service.dart:
 ```
+// ignore_for_file: avoid_print
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
@@ -9878,7 +10157,7 @@ class ApiService {
     return await get('/api/v3/exchangeInfo', requiresAuth: false);
   }
 
-  Future<List<List<dynamic>>> getKlines({
+  Future<List<List<dynamic>>> getKlinesOld({
     required String symbol,
     required String interval,
     int? limit,
@@ -9913,13 +10192,40 @@ class ApiService {
         .toList();
   }
 
-  Stream<Map<String, dynamic>> getKlineStream(String symbol, String interval) {
+  Future<List<List<dynamic>>> getKlines({
+    required String symbol,
+    required String interval,
+    int? limit,
+  }) async {
+    try {
+      final uri = Uri.parse(
+          '$baseUrl/api/v3/klines?symbol=$symbol&interval=$interval${limit != null ? '&limit=$limit' : ''}');
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = List<List<dynamic>>.from(json.decode(response.body));
+        print('Klines data received: ${data.length} candles');
+        return data;
+      } else {
+        print('Failed to load klines. Status code: ${response.statusCode}');
+        throw Exception(
+            'Failed to load klines. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching klines: $e');
+      throw Exception('Failed to fetch klines: $e');
+    }
+  }
+
+  Stream<dynamic> getKlineStream(String symbol, String interval) {
     final wsUrl =
         'wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_$interval';
     final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
     return channel.stream.map((event) {
-      return jsonDecode(event);
+      final decoded = jsonDecode(event);
+      print('Decoded kline event: $decoded'); // Aggiunto per il debug
+      return decoded;
     });
   }
 

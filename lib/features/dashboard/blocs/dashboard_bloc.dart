@@ -25,7 +25,7 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       final weeklyProfitLoss = await _repository.getWeeklyProfitLoss();
       final monthlyProfitLoss = await _repository.getMonthlyProfitLoss();
       final marketData = await _repository.getMarketData('BTCUSDT');
-      final selectedSymbol = 'BTCUSDT';
+      const selectedSymbol = 'BTCUSDT';
 
       emit(DashboardLoaded(
           portfolio: portfolio,

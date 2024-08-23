@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
@@ -6,11 +8,14 @@ import 'package:crypto/crypto.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class ApiService {
-  final String apiKey;
-  final String secretKey;
+  final String? apiKey;
+  final String? secretKey;
   final String baseUrl = 'https://api.binance.com';
 
   ApiService({required this.apiKey, required this.secretKey});
+  factory ApiService.public() {
+    return ApiService(apiKey: null, secretKey: null);
+  }
 
   Future<int> getServerTime() async {
     try {
@@ -59,6 +64,29 @@ class ApiService {
       return response;
     } catch (e) {
       throw Exception('Failed to create market sell order: $e');
+    }
+  }
+
+  Future<List<String>> getPublicTradingSymbols() async {
+    final String url = '$baseUrl/api/v3/exchangeInfo';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final symbols = (data['symbols'] as List)
+            .where((s) => s['status'] == 'TRADING')
+            .map((s) => s['symbol'] as String)
+            .toList();
+
+        symbols.sort();
+        return symbols;
+      } else {
+        throw Exception('Failed to load trading symbols');
+      }
+    } catch (e) {
+      throw Exception('Error fetching trading symbols: $e');
     }
   }
 
@@ -112,14 +140,14 @@ class ApiService {
   Map<String, String> _getHeaders(bool requiresAuth) {
     var headers = {'Content-Type': 'application/x-www-form-urlencoded'};
     if (requiresAuth) {
-      headers['X-MBX-APIKEY'] = apiKey;
+      headers['X-MBX-APIKEY'] = apiKey!;
     }
     return headers;
   }
 
   String _generateSignature(Map<String, dynamic> params) {
     final queryString = Uri(queryParameters: params).query;
-    final hmac = Hmac(sha256, utf8.encode(secretKey));
+    final hmac = Hmac(sha256, utf8.encode(secretKey!));
     final signature = hmac.convert(utf8.encode(queryString)).toString();
     return signature;
   }
@@ -184,7 +212,7 @@ class ApiService {
     return await get('/api/v3/exchangeInfo', requiresAuth: false);
   }
 
-  Future<List<List<dynamic>>> getKlines({
+  Future<List<List<dynamic>>> getKlinesOld({
     required String symbol,
     required String interval,
     int? limit,
@@ -219,13 +247,40 @@ class ApiService {
         .toList();
   }
 
-  Stream<Map<String, dynamic>> getKlineStream(String symbol, String interval) {
+  Future<List<List<dynamic>>> getKlines({
+    required String symbol,
+    required String interval,
+    int? limit,
+  }) async {
+    try {
+      final uri = Uri.parse(
+          '$baseUrl/api/v3/klines?symbol=$symbol&interval=$interval${limit != null ? '&limit=$limit' : ''}');
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = List<List<dynamic>>.from(json.decode(response.body));
+        print('Klines data received: ${data.length} candles');
+        return data;
+      } else {
+        print('Failed to load klines. Status code: ${response.statusCode}');
+        throw Exception(
+            'Failed to load klines. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching klines: $e');
+      throw Exception('Failed to fetch klines: $e');
+    }
+  }
+
+  Stream<dynamic> getKlineStream(String symbol, String interval) {
     final wsUrl =
         'wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_$interval';
     final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
     return channel.stream.map((event) {
-      return jsonDecode(event);
+      final decoded = jsonDecode(event);
+      print('Decoded kline event: $decoded'); // Aggiunto per il debug
+      return decoded;
     });
   }
 

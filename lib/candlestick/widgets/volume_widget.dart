@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '.././models/candle.dart';
+import '../models/candle.dart';
 
 class VolumeRenderObject extends RenderBox {
   late List<Candle> _candles;

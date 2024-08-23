@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '.././models/candle.dart';
-import '.././utils/helper_functions.dart';
+import '../models/candle.dart';
+import '../utils/helper_functions.dart';
 
 class CandleInfoText extends StatelessWidget {
   final Candle candle;
@@ -10,12 +10,12 @@ class CandleInfoText extends StatelessWidget {
   final Color bearColor;
   final TextStyle defaultStyle;
   const CandleInfoText({
-    super.key,
+    Key? key,
     required this.candle,
     required this.bullColor,
     required this.bearColor,
     required this.defaultStyle,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

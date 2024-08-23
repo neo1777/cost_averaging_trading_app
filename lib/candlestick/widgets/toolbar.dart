@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class ToolBar extends StatelessWidget {
-  const ToolBar({super.key, required this.children, required this.color});
+  const ToolBar({Key? key, required this.children, required this.color})
+      : super(key: key);
 
   final List<Widget> children;
   final Color color;
