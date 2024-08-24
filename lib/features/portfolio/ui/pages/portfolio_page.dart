@@ -8,7 +8,7 @@ import 'package:cost_averaging_trading_app/features/portfolio/ui/widgets/portfol
 import 'package:cost_averaging_trading_app/features/portfolio/ui/widgets/asset_list.dart';
 
 class PortfolioPage extends StatelessWidget {
-  const PortfolioPage({Key? key}) : super(key: key);
+  const PortfolioPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +70,7 @@ class PortfolioPage extends StatelessWidget {
         },
       );
     } else if (state is PortfolioEmpty) {
-      return Center(
+      return const Center(
           child: Text('Il tuo portfolio è vuoto. Inizia a fare trading!'));
     } else if (state is PortfolioError) {
       return Center(child: Text(state.message));

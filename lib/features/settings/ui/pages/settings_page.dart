@@ -10,7 +10,7 @@ import 'package:cost_averaging_trading_app/features/settings/ui/widgets/api_sett
 import 'package:cost_averaging_trading_app/features/settings/ui/widgets/advanced_settings.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({Key? key}) : super(key: key);
+  const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {

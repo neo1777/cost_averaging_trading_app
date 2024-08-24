@@ -7,11 +7,10 @@ import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_hi
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_state.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_event.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_filters.dart';
-import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_statistics.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_list.dart';
 
 class TradeHistoryPage extends StatelessWidget {
-  const TradeHistoryPage({Key? key}) : super(key: key);
+  const TradeHistoryPage({super.key});
 
   @override
   Widget build(BuildContext context) {

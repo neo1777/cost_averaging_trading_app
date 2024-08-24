@@ -32,7 +32,7 @@ class PortfolioBloc extends Bloc<PortfolioEvent, PortfolioState> {
         ));
       }
     } catch (e) {
-      emit(PortfolioError("Si è verificato un errore imprevisto. Per favore, riprova più tardi."));
+      emit(const PortfolioError("Si è verificato un errore imprevisto. Per favore, riprova più tardi."));
     }
   }
 }

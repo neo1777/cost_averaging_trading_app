@@ -39,7 +39,7 @@ class PortfolioRepository {
       );
     } catch (e) {
       // Se fallisce l'API, restituisci un portfolio vuoto
-      return Portfolio(
+      return const Portfolio(
         id: 'default',
         assets: {},
         totalValue: 0,

@@ -10,12 +10,12 @@ class AdvancedSettings extends StatelessWidget {
   final Function(RiskManagementSettings)? onUpdateRiskManagement;
 
   const AdvancedSettings({
-    Key? key,
+    super.key,
     required this.isAdvancedMode,
     required this.onToggleAdvancedMode,
     this.riskManagementSettings,
     this.onUpdateRiskManagement,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

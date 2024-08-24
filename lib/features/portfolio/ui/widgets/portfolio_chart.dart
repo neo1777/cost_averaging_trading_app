@@ -6,7 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 class PortfolioChart extends StatelessWidget {
   final List<Map<String, dynamic>> chartData;
 
-  const PortfolioChart({Key? key, required this.chartData}) : super(key: key);
+  const PortfolioChart({super.key, required this.chartData});
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +22,8 @@ class PortfolioChart extends StatelessWidget {
               height: 300,
               child: LineChart(
                 LineChartData(
-                  gridData: FlGridData(show: false),
-                  titlesData: FlTitlesData(show: false),
+                  gridData: const FlGridData(show: false),
+                  titlesData: const FlTitlesData(show: false),
                   borderData: FlBorderData(show: true),
                   minX: 0,
                   maxX: chartData.length.toDouble() - 1,
@@ -36,7 +36,7 @@ class PortfolioChart extends StatelessWidget {
                       }).toList(),
                       isCurved: true,
                       color: Theme.of(context).colorScheme.primary,
-                      dotData: FlDotData(show: false),
+                      dotData: const FlDotData(show: false),
                       belowBarData: BarAreaData(
                         show: true,
                         color: Theme.of(context).colorScheme.primary.withOpacity(0.3),

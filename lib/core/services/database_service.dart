@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:convert';
@@ -12,7 +13,9 @@ class DatabaseService {
     if (_database != null) return;
     String path = join(await getDatabasesPath(), _databaseName);
     try {
-      print("Attempting to open database at $path");
+      if (kDebugMode) {
+        print("Attempting to open database at $path");
+      }
       _database = await openDatabase(
         path,
         version: _databaseVersion,
@@ -20,10 +23,16 @@ class DatabaseService {
         onUpgrade: _upgradeDb,
         onConfigure: _configureDb,
       );
-      print("Database opened successfully");
+      if (kDebugMode) {
+        print("Database opened successfully");
+      }
     } catch (e) {
-      print("Error initializing database: $e");
-      print("Attempting to delete and recreate database");
+      if (kDebugMode) {
+        print("Error initializing database: $e");
+      }
+      if (kDebugMode) {
+        print("Attempting to delete and recreate database");
+      }
       await deleteDatabase(path);
       _database = await openDatabase(
         path,
@@ -47,7 +56,9 @@ class DatabaseService {
   }
 
   Future<void> _createDb(Database db, int version) async {
-    print("Creating new database...");
+    if (kDebugMode) {
+      print("Creating new database...");
+    }
 
     await _createTableIfNotExists(db, 'trades', '''
       CREATE TABLE trades(
@@ -125,19 +136,29 @@ class DatabaseService {
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_price_history_symbol_timestamp ON price_history(symbol, timestamp)');
 
-    print("Database creation completed");
+    if (kDebugMode) {
+      print("Database creation completed");
+    }
   }
 
   Future<void> _createTableIfNotExists(
       Database db, String tableName, String createTableSql) async {
-    print("Checking if table $tableName exists...");
+    if (kDebugMode) {
+      print("Checking if table $tableName exists...");
+    }
     var tableExists = await _checkIfTableExists(db, tableName);
     if (!tableExists) {
-      print("Creating table $tableName");
+      if (kDebugMode) {
+        print("Creating table $tableName");
+      }
       await db.execute(createTableSql);
-      print("Table $tableName created successfully");
+      if (kDebugMode) {
+        print("Table $tableName created successfully");
+      }
     } else {
-      print("Table $tableName already exists");
+      if (kDebugMode) {
+        print("Table $tableName already exists");
+      }
     }
   }
 
@@ -149,7 +170,9 @@ class DatabaseService {
   }
 
   Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
-    print("Upgrading database from $oldVersion to $newVersion");
+    if (kDebugMode) {
+      print("Upgrading database from $oldVersion to $newVersion");
+    }
     // Add upgrade logic here if needed in the future
   }
 
@@ -307,15 +330,6 @@ class DatabaseService {
   //   await _createPortfolioValueTable(db);
   // }
 
-  Future<void> _createPortfolioValueTable(Database db) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS portfolio_value (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL,
-        value REAL NOT NULL
-      )
-    ''');
-  }
 
   // Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
   //   if (oldVersion < 2) {

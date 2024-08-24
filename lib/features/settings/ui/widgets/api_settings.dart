@@ -9,12 +9,12 @@ class ApiSettings extends StatelessWidget {
   final Function(String) onSecretKeyChanged;
 
   const ApiSettings({
-    Key? key,
+    super.key,
     required this.apiKey,
     required this.secretKey,
     required this.onApiKeyChanged,
     required this.onSecretKeyChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

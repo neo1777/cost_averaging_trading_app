@@ -1,5 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
 import 'package:cost_averaging_trading_app/features/settings/blocs/settings_event.dart';
 import 'package:cost_averaging_trading_app/features/settings/blocs/settings_state.dart';
 import 'package:cost_averaging_trading_app/features/settings/repositories/settings_repository.dart';

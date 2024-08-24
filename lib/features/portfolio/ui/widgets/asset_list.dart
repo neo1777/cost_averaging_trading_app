@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 class AssetList extends StatelessWidget {
   final Map<String, double> assets;
 
-  const AssetList({Key? key, required this.assets}) : super(key: key);
+  const AssetList({super.key, required this.assets});
 
   @override
   Widget build(BuildContext context) {
