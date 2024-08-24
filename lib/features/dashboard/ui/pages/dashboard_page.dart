@@ -1,3 +1,5 @@
+// lib/features/dashboard/ui/pages/dashboard_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/features/dashboard/blocs/dashboard_bloc.dart';
@@ -21,7 +23,7 @@ class DashboardPage extends StatelessWidget {
           context.read<DashboardBloc>().add(LoadDashboardData());
         }
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: Theme.of(context).colorScheme.background,
           body: _buildDashboardContent(context, state),
         );
       },
@@ -39,93 +41,59 @@ class DashboardPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Dashboard',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold)),
-              SizedBox(height: 16),
-              _buildPortfolioOverview(context, state),
-              SizedBox(height: 16),
-              _buildMarketChart(context, state),
-              SizedBox(height: 16),
-              _buildRecentTrades(context, state),
+                  style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 16),
+              _buildGridLayout(context, state),
             ],
           ),
         ),
       );
     } else if (state is DashboardError) {
-      return Center(
-          child: Text('Error: ${state.message}',
-              style: TextStyle(color: Colors.white)));
+      return Center(child: Text('Error: ${state.message}'));
     }
-    return Center(
-        child: Text('Unknown state', style: TextStyle(color: Colors.white)));
+    return const Center(child: Text('Unknown state'));
+  }
+
+  Widget _buildGridLayout(BuildContext context, DashboardLoaded state) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GridView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.5,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+          ),
+          children: [
+            _buildPortfolioOverview(context, state),
+            _buildMarketChart(context, state),
+            _buildRecentTrades(context, state),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildPortfolioOverview(BuildContext context, DashboardLoaded state) {
-    return Card(
-      color: Colors.grey[900],
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: PortfolioOverview(
-          totalValue: state.portfolio.totalValue,
-          dailyChange: state.dailyChange,
-          assets: state.portfolio.assets,
-        ),
-      ),
+    return PortfolioOverview(
+      totalValue: state.portfolio.totalValue,
+      dailyChange: state.dailyChange,
+      assets: state.portfolio.assets,
     );
   }
 
   Widget _buildMarketChart(BuildContext context, DashboardLoaded state) {
-    return Card(
-      color: Colors.grey[900],
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Market Chart',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Container(
-              height: 400,
-              child: MarketChart(apiService: publicApiService),
-            ),
-          ],
-        ),
-      ),
-    );
+    return MarketChart(apiService: publicApiService);
   }
 
   Widget _buildRecentTrades(BuildContext context, DashboardLoaded state) {
-    return Card(
-      color: Colors.grey[900],
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Recent Trades',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Container(
-              height: 200,
-              child: RecentTradesWidget(
-                trades: state.recentTrades,
-                onViewAllTrades: () {
-                  Navigator.pushNamed(context, '/trade-history');
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+    return RecentTradesWidget(
+      trades: state.recentTrades,
+      onViewAllTrades: () {
+        Navigator.pushNamed(context, '/trade-history');
+      },
     );
   }
 }

@@ -1,3 +1,5 @@
+// lib/features/dashboard/ui/widgets/market_chart.dart
+
 import 'package:cost_averaging_trading_app/candlestick/models/candle.dart';
 import 'package:cost_averaging_trading_app/candlestick/models/candle_sticks_style.dart';
 import 'package:flutter/material.dart';
@@ -11,31 +13,42 @@ import 'package:cost_averaging_trading_app/core/services/api_service.dart';
 class MarketChart extends StatelessWidget {
   final ApiService apiService;
 
-  MarketChart({Key? key, required this.apiService}) : super(key: key);
+  const MarketChart({super.key, required this.apiService});
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ChartBloc, ChartState>(
       builder: (context, state) {
         if (state is ChartLoaded) {
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildSelectors(context, state),
-                _buildCandlestickChart(context, state),
-              ],
+          return Card(
+            elevation: 4,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Market Chart',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSelectors(context, state),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _buildCandlestickChart(context, state),
+                  ),
+                ],
+              ),
             ),
           );
         } else if (state is ChartLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is ChartError) {
-          return Center(
-              child:
-                  Text(state.message, style: TextStyle(color: Colors.white)));
+          return Center(child: Text(state.message));
         } else {
-          return const Center(
-              child:
-                  Text('Unknown state', style: TextStyle(color: Colors.white)));
+          return const Center(child: Text('Unknown state'));
         }
       },
     );
@@ -71,18 +84,15 @@ class MarketChart extends StatelessWidget {
             items: snapshot.data!.map((String value) {
               return DropdownMenuItem<String>(
                 value: value,
-                child: Text(value, style: TextStyle(color: Colors.white)),
+                child: Text(value),
               );
             }).toList(),
             onChanged: onChanged,
-            style: TextStyle(color: Colors.white),
-            dropdownColor: Colors.grey[900],
           );
         } else if (snapshot.hasError) {
-          return Text('Error: ${snapshot.error}',
-              style: TextStyle(color: Colors.white));
+          return Text('Error: ${snapshot.error}');
         }
-        return CircularProgressIndicator();
+        return const CircularProgressIndicator();
       },
     );
   }
@@ -110,7 +120,7 @@ class MarketChart extends StatelessWidget {
       items: intervals.map((String value) {
         return DropdownMenuItem<String>(
           value: value,
-          child: Text(value, style: TextStyle(color: Colors.white)),
+          child: Text(value),
         );
       }).toList(),
       onChanged: (String? newValue) {
@@ -118,31 +128,25 @@ class MarketChart extends StatelessWidget {
           context.read<ChartBloc>().add(ChangeInterval(newValue));
         }
       },
-      style: TextStyle(color: Colors.white),
-      dropdownColor: Colors.grey[900],
     );
   }
 
   Widget _buildCandlestickChart(BuildContext context, ChartLoaded state) {
-    // Rimuovi eventuali duplicati dai dati delle candele
     final uniqueCandles = _removeDuplicates(state.candles);
 
-    return Container(
-      height: 400,
-      child: Candlesticks(
-        candles: uniqueCandles,
-        onLoadMoreCandles: () async {
-          final oldestCandle = uniqueCandles.last;
-          final ChartBloc chartBloc = context.read<ChartBloc>();
-          chartBloc.add(LoadMoreCandles(
-            symbol: state.symbol,
-            interval: state.interval,
-            endTime: oldestCandle.date.millisecondsSinceEpoch,
-          ));
-          await Future.delayed(const Duration(seconds: 1));
-        },
-        style: CandleSticksStyle.dark(),
-      ),
+    return Candlesticks(
+      candles: uniqueCandles,
+      onLoadMoreCandles: () async {
+        final oldestCandle = uniqueCandles.last;
+        final ChartBloc chartBloc = context.read<ChartBloc>();
+        chartBloc.add(LoadMoreCandles(
+          symbol: state.symbol,
+          interval: state.interval,
+          endTime: oldestCandle.date.millisecondsSinceEpoch,
+        ));
+        await Future.delayed(const Duration(seconds: 1));
+      },
+      style: CandleSticksStyle.dark(),
     );
   }
 

@@ -189,7 +189,6 @@ class _CandlesticksState extends State<Candlesticks> {
                     index: index,
                   );
                 } else {
-                  print('view mobile chart');
                   return MobileChart(
                     style: style,
                     onRemoveIndicator: widget.onRemoveIndicator,

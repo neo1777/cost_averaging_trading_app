@@ -15,14 +15,14 @@ class TimeRow extends StatefulWidget {
   final CandleSticksStyle style;
 
   const TimeRow({
-    Key? key,
+    super.key,
     required this.candles,
     required this.candleWidth,
     this.indicatorX,
     required this.indicatorTime,
     required this.index,
     required this.style,
-  }) : super(key: key);
+  });
 
   @override
   State<TimeRow> createState() => _TimeRowState();

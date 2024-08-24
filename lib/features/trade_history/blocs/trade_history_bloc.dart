@@ -11,6 +11,7 @@ class TradeHistoryBloc extends Bloc<TradeHistoryEvent, TradeHistoryState> {
     on<LoadTradeHistory>(_onLoadTradeHistory);
     on<FilterTradeHistory>(_onFilterTradeHistory);
     on<ChangePage>(_onChangePage);
+    add(LoadTradeHistory());
   }
 
   Future<void> _onLoadTradeHistory(
@@ -63,7 +64,6 @@ class TradeHistoryBloc extends Bloc<TradeHistoryEvent, TradeHistoryState> {
     }
   }
 
-
   TradeHistoryLoaded _createLoadedState(
       TradeHistoryResult result, int currentPage,
       [int? totalPages]) {
@@ -87,5 +87,4 @@ class TradeHistoryBloc extends Bloc<TradeHistoryEvent, TradeHistoryState> {
       totalPages: totalPages ?? result.totalPages,
     );
   }
-
 }

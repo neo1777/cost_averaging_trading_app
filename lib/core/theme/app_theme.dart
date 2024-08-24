@@ -1,55 +1,72 @@
+// lib/core/theme/app_theme.dart
+
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static ThemeData get lightTheme {
-    return ThemeData(
-      primarySwatch: Colors.blue,
-      scaffoldBackgroundColor: Colors.white,
-      appBarTheme: const AppBarTheme(
-        color: Colors.blue,
-        elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
-      ),
-      cardTheme: CardTheme(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      textTheme: const TextTheme(
-        titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        bodyLarge: TextStyle(fontSize: 16),
-        bodyMedium: TextStyle(fontSize: 14),
-      ),
-      buttonTheme: ButtonThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        buttonColor: Colors.blue,
-      ),
-    );
-  }
-
   static ThemeData get darkTheme {
-    return ThemeData(
-      brightness: Brightness.dark,
-      primarySwatch: Colors.blue,
-      scaffoldBackgroundColor: Colors.grey[900],
-      appBarTheme: AppBarTheme(
-        color: Colors.grey[800],
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+    const primaryColor = Color(0xFF2196F3);
+    const backgroundColor = Color(0xFF121212);
+    const surfaceColor = Color(0xFF1E1E1E);
+    const textColor = Color(0xFFFFFFFF);
+
+    return ThemeData.dark().copyWith(
+      primaryColor: primaryColor,
+      scaffoldBackgroundColor: backgroundColor,
       cardTheme: CardTheme(
-        color: Colors.grey[800],
-        elevation: 2,
+        color: surfaceColor,
+        elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       textTheme: const TextTheme(
+        headlineMedium: TextStyle(
+            fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
         titleLarge: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-        bodyLarge: TextStyle(fontSize: 16, color: Colors.white70),
-        bodyMedium: TextStyle(fontSize: 14, color: Colors.white70),
+            fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
+        titleMedium: TextStyle(
+            fontSize: 16, fontWeight: FontWeight.w600, color: textColor),
+        bodyLarge: TextStyle(fontSize: 16, color: textColor),
+        bodyMedium: TextStyle(fontSize: 14, color: textColor),
       ),
-      buttonTheme: ButtonThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        buttonColor: Colors.blue,
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[600]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: primaryColor),
+        ),
+        filled: true,
+        fillColor: surfaceColor,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          foregroundColor: textColor, backgroundColor: primaryColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: MaterialStateProperty.resolveWith<Color>(
+            (Set<MaterialState> states) {
+          if (states.contains(MaterialState.selected)) {
+            return primaryColor;
+          }
+          return Colors.grey;
+        }),
+        trackColor: MaterialStateProperty.resolveWith<Color>(
+            (Set<MaterialState> states) {
+          if (states.contains(MaterialState.selected)) {
+            return primaryColor.withOpacity(0.5);
+          }
+          return Colors.grey.withOpacity(0.5);
+        }),
+      ),
+      colorScheme: ColorScheme.dark(
+        primary: primaryColor,
+        secondary: primaryColor.withOpacity(0.7),
+        surface: surfaceColor,
+        background: backgroundColor,
+        error: Colors.red[700]!,
       ),
     );
   }

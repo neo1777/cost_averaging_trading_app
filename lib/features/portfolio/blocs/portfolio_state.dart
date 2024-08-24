@@ -1,5 +1,5 @@
-import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
 import 'package:equatable/equatable.dart';
+import 'package:cost_averaging_trading_app/core/models/portfolio.dart';
 
 abstract class PortfolioState extends Equatable {
   const PortfolioState();
@@ -26,9 +26,10 @@ class PortfolioLoaded extends PortfolioState {
   });
 
   @override
-  List<Object> get props =>
-      [portfolio, performanceData, dailyChange, weeklyChange];
+  List<Object> get props => [portfolio, performanceData, dailyChange, weeklyChange];
 }
+
+class PortfolioEmpty extends PortfolioState {}
 
 class PortfolioError extends PortfolioState {
   final String message;

@@ -7,7 +7,7 @@ import 'package:cost_averaging_trading_app/features/settings/models/settings_mod
 class TradingRepositoryImpl implements TradingRepository {
   final ApiService _apiService;
   final DatabaseService _databaseService;
-  final SettingsModel _settings;
+  final SettingsModelComplete _settings;
 
   TradingRepositoryImpl(
       this._apiService, this._databaseService, this._settings);

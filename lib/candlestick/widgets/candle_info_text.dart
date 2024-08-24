@@ -10,12 +10,12 @@ class CandleInfoText extends StatelessWidget {
   final Color bearColor;
   final TextStyle defaultStyle;
   const CandleInfoText({
-    Key? key,
+    super.key,
     required this.candle,
     required this.bullColor,
     required this.bearColor,
     required this.defaultStyle,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

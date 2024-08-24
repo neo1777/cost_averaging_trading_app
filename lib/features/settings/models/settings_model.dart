@@ -1,6 +1,38 @@
+// lib/features/settings/models/settings_model.dart
+
+import 'package:cost_averaging_trading_app/core/models/risk_management_settings.dart';
 import 'package:equatable/equatable.dart';
 
-class SettingsModel extends Equatable {
+class SettingsModel {
+  final String apiKey;
+  final String secretKey;
+  final bool isAdvancedMode;
+  final RiskManagementSettings riskManagementSettings;
+
+  SettingsModel({
+    required this.apiKey,
+    required this.secretKey,
+    required this.isAdvancedMode,
+    required this.riskManagementSettings,
+  });
+
+  SettingsModel copyWith({
+    String? apiKey,
+    String? secretKey,
+    bool? isAdvancedMode,
+    RiskManagementSettings? riskManagementSettings,
+  }) {
+    return SettingsModel(
+      apiKey: apiKey ?? this.apiKey,
+      secretKey: secretKey ?? this.secretKey,
+      isAdvancedMode: isAdvancedMode ?? this.isAdvancedMode,
+      riskManagementSettings:
+          riskManagementSettings ?? this.riskManagementSettings,
+    );
+  }
+}
+
+class SettingsModelComplete extends Equatable {
   final double maxLossPercentage;
   final int maxConcurrentTrades;
   final double maxPositionSizePercentage;
@@ -13,7 +45,7 @@ class SettingsModel extends Equatable {
   final String apiKey;
   final String secretKey;
 
-  const SettingsModel({
+  const SettingsModelComplete({
     required this.maxLossPercentage,
     required this.maxConcurrentTrades,
     required this.maxPositionSizePercentage,
@@ -27,8 +59,8 @@ class SettingsModel extends Equatable {
     required this.secretKey,
   });
 
-  factory SettingsModel.defaultSettings() {
-    return const SettingsModel(
+  factory SettingsModelComplete.defaultSettings() {
+    return const SettingsModelComplete(
       maxLossPercentage: 2.0,
       maxConcurrentTrades: 3,
       maxPositionSizePercentage: 5.0,
@@ -43,7 +75,7 @@ class SettingsModel extends Equatable {
     );
   }
 
-  SettingsModel copyWith({
+  SettingsModelComplete copyWith({
     double? maxLossPercentage,
     int? maxConcurrentTrades,
     double? maxPositionSizePercentage,
@@ -56,7 +88,7 @@ class SettingsModel extends Equatable {
     String? apiKey,
     String? secretKey,
   }) {
-    return SettingsModel(
+    return SettingsModelComplete(
       maxLossPercentage: maxLossPercentage ?? this.maxLossPercentage,
       maxConcurrentTrades: maxConcurrentTrades ?? this.maxConcurrentTrades,
       maxPositionSizePercentage:
@@ -73,8 +105,8 @@ class SettingsModel extends Equatable {
     );
   }
 
-  factory SettingsModel.fromJson(Map<String, dynamic> json) {
-    return SettingsModel(
+  factory SettingsModelComplete.fromJson(Map<String, dynamic> json) {
+    return SettingsModelComplete(
       maxLossPercentage: json['maxLossPercentage'],
       maxConcurrentTrades: json['maxConcurrentTrades'],
       maxPositionSizePercentage: json['maxPositionSizePercentage'],

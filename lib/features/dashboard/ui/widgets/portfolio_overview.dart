@@ -1,5 +1,6 @@
+// lib/features/dashboard/ui/widgets/portfolio_overview.dart
+
 import 'package:flutter/material.dart';
-import 'package:cost_averaging_trading_app/core/widgets/custom_card.dart';
 
 class PortfolioOverview extends StatelessWidget {
   final double totalValue;
@@ -15,28 +16,44 @@ class PortfolioOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomCard(
-      title: 'Portfolio Overview',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Total Value: \$${totalValue.toStringAsFixed(2)}',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '24h Change: ${_formatChange(dailyChange)}',
-            style: TextStyle(
-              color: dailyChange >= 0 ? Colors.green : Colors.red,
-              fontWeight: FontWeight.bold,
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Portfolio Overview',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-          ),
-          const SizedBox(height: 16),
-          Text('Asset Distribution:', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          ...assets.entries.map((entry) => _buildAssetRow(entry.key, entry.value)),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Total Value: \$${totalValue.toStringAsFixed(2)}',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '24h Change: ${_formatChange(dailyChange)}',
+              style: TextStyle(
+                color: dailyChange >= 0 ? Colors.green : Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Asset Distribution:',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView(
+                children: assets.entries
+                    .map((entry) => _buildAssetRow(entry.key, entry.value))
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

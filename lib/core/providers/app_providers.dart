@@ -1,5 +1,6 @@
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_bloc.dart';
 import 'package:cost_averaging_trading_app/features/chart/blocs/chart_event.dart';
+import 'package:cost_averaging_trading_app/features/settings/blocs/settings_event.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -37,6 +38,12 @@ class AppProviders extends StatelessWidget {
         ),
         RepositoryProvider<DatabaseService>(
           create: (context) => DatabaseService(),
+        ),
+        RepositoryProvider<PortfolioRepository>(
+          create: (context) => PortfolioRepository(
+            apiService: context.read<ApiService>(),
+            databaseService: context.read<DatabaseService>(),
+          ),
         ),
         RepositoryProvider<SecureStorageService>(
           create: (context) => SecureStorageService(),
@@ -108,7 +115,8 @@ class AppProviders extends StatelessWidget {
           ),
           BlocProvider<SettingsBloc>(
             create: (context) =>
-                SettingsBloc(context.read<SettingsRepository>()),
+                SettingsBloc(context.read<SettingsRepository>())
+                  ..add(LoadSettings()),
           ),
           BlocProvider<ChartBloc>(
             create: (context) => ChartBloc(
@@ -116,6 +124,11 @@ class AppProviders extends StatelessWidget {
               apiService: context.read<ApiService>(),
             )..add(
                 LoadChartData()), // Aggiungi questo per caricare i dati immediatamente
+          ),
+          BlocProvider<PortfolioBloc>(
+            create: (context) => PortfolioBloc(
+              context.read<PortfolioRepository>(),
+            ),
           ),
         ],
         child: child,

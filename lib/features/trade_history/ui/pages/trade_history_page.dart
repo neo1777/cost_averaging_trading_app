@@ -1,86 +1,82 @@
+// lib/features/trade_history/ui/pages/trade_history_page.dart
+
+import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_stats.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_bloc.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_state.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/blocs/trade_history_event.dart';
-import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_list.dart';
 import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_filters.dart';
-import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_stats.dart';
-import 'package:cost_averaging_trading_app/ui/layouts/custom_page_layout.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_statistics.dart';
+import 'package:cost_averaging_trading_app/features/trade_history/ui/widgets/trade_list.dart';
 
 class TradeHistoryPage extends StatelessWidget {
-  const TradeHistoryPage({super.key});
+  const TradeHistoryPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TradeHistoryBloc, TradeHistoryState>(
       builder: (context, state) {
-        return CustomPageLayout(
-          title: 'Trade History',
-          useSliver: true,
-          children: _buildTradeHistoryContent(context, state),
+        return Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.background,
+          body: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Trade History',
+                      style: Theme.of(context).textTheme.headlineMedium),
+                  const SizedBox(height: 16),
+                  _buildTradeHistoryContent(context, state),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
   }
 
-  List<Widget> _buildTradeHistoryContent(
+  Widget _buildTradeHistoryContent(
       BuildContext context, TradeHistoryState state) {
-    if (state is TradeHistoryInitial) {
-      context.read<TradeHistoryBloc>().add(LoadTradeHistory());
-      return [const Center(child: CircularProgressIndicator())];
-    } else if (state is TradeHistoryLoading) {
-      return [const Center(child: CircularProgressIndicator())];
-    } else if (state is TradeHistoryLoaded) {
-      return [
-        _buildFilters(context),
-        const SizedBox(height: 16),
-        _buildTradeStats(state),
-        const SizedBox(height: 16),
-        _buildTradeList(state),
-        const SizedBox(height: 16),
-        _buildPagination(context, state),
-      ];
+    // ... [il resto del codice rimane invariato]
+    if (state is TradeHistoryLoaded) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              _buildTile(constraints, TradeFilters(
+                onFilterApplied: (startDate, endDate, assetPair) {
+                  context.read<TradeHistoryBloc>().add(FilterTradeHistory(
+                        startDate: startDate,
+                        endDate: endDate,
+                        assetPair: assetPair,
+                      ));
+                },
+              )),
+              _buildTile(constraints, TradeStats(stats: state.statistics)),
+              _buildTile(constraints, TradeList(trades: state.trades)),
+              _buildPagination(context, state),
+            ],
+          );
+        },
+      );
     } else if (state is TradeHistoryError) {
-      return [Center(child: Text('Error: ${state.message}'))];
+      return Center(child: Text('Error: ${state.message}'));
     }
-    return [const Center(child: Text('Unknown state'))];
+    return const Center(child: Text('Unknown state'));
   }
 
-  Widget _buildFilters(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: TradeFilters(
-          onFilterApplied: (startDate, endDate, assetPair) {
-            context.read<TradeHistoryBloc>().add(
-                  FilterTradeHistory(
-                    startDate: startDate,
-                    endDate: endDate,
-                    assetPair: assetPair,
-                  ),
-                );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTradeStats(TradeHistoryLoaded state) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: TradeStats(stats: state.statistics),
-      ),
-    );
-  }
-
-  Widget _buildTradeList(TradeHistoryLoaded state) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: TradeList(trades: state.trades),
-      ),
+  Widget _buildTile(BoxConstraints constraints, Widget child) {
+    double width = constraints.maxWidth > 600
+        ? (constraints.maxWidth - 16) / 2
+        : constraints.maxWidth;
+    return SizedBox(
+      width: width,
+      child: child,
     );
   }
 

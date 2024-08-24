@@ -1,5 +1,6 @@
 // lib/features/settings/repositories/settings_repository.dart
 
+import 'package:cost_averaging_trading_app/core/models/risk_management_settings.dart';
 import 'package:cost_averaging_trading_app/core/services/secure_storage_service.dart';
 import 'package:cost_averaging_trading_app/features/settings/models/settings_model.dart';
 
@@ -8,20 +9,44 @@ class SettingsRepository {
 
   SettingsRepository(this._secureStorage);
 
-   Future<SettingsModel> getSettings() async {
+  Future<SettingsModel> getSettings() async {
+    final apiKey = await _secureStorage.getApiKey() ?? '';
+    final secretKey = await _secureStorage.getSecretKey() ?? '';
+    final isAdvancedMode =
+        await _secureStorage.getValue('isAdvancedMode') == 'true';
+    final riskManagementSettings = await _getRiskManagementSettings();
+
+    return SettingsModel(
+      apiKey: apiKey,
+      secretKey: secretKey,
+      isAdvancedMode: isAdvancedMode,
+      riskManagementSettings: riskManagementSettings,
+    );
+  }
+
+  Future<SettingsModelComplete> getSettingsComplete() async {
     final apiKey = await _secureStorage.getApiKey() ?? '';
     final secretKey = await _secureStorage.getSecretKey() ?? '';
     final isDemoMode = await _secureStorage.getValue('isDemoMode') == 'true';
-    final isBacktestingEnabled = await _secureStorage.getValue('isBacktestingEnabled') == 'true';
-    final maxLossPercentage = double.parse(await _secureStorage.getValue('maxLossPercentage') ?? '2.0');
-    final maxConcurrentTrades = int.parse(await _secureStorage.getValue('maxConcurrentTrades') ?? '3');
-    final maxPositionSizePercentage = double.parse(await _secureStorage.getValue('maxPositionSizePercentage') ?? '5.0');
-    final dailyExposureLimit = double.parse(await _secureStorage.getValue('dailyExposureLimit') ?? '1000.0');
-    final maxAllowedVolatility = double.parse(await _secureStorage.getValue('maxAllowedVolatility') ?? '0.05');
-    final maxRebuyCount = int.parse(await _secureStorage.getValue('maxRebuyCount') ?? '3');
-    final maxVariableInvestmentPercentage = double.parse(await _secureStorage.getValue('maxVariableInvestmentPercentage') ?? '20.0');
+    final isBacktestingEnabled =
+        await _secureStorage.getValue('isBacktestingEnabled') == 'true';
+    final maxLossPercentage = double.parse(
+        await _secureStorage.getValue('maxLossPercentage') ?? '2.0');
+    final maxConcurrentTrades =
+        int.parse(await _secureStorage.getValue('maxConcurrentTrades') ?? '3');
+    final maxPositionSizePercentage = double.parse(
+        await _secureStorage.getValue('maxPositionSizePercentage') ?? '5.0');
+    final dailyExposureLimit = double.parse(
+        await _secureStorage.getValue('dailyExposureLimit') ?? '1000.0');
+    final maxAllowedVolatility = double.parse(
+        await _secureStorage.getValue('maxAllowedVolatility') ?? '0.05');
+    final maxRebuyCount =
+        int.parse(await _secureStorage.getValue('maxRebuyCount') ?? '3');
+    final maxVariableInvestmentPercentage = double.parse(
+        await _secureStorage.getValue('maxVariableInvestmentPercentage') ??
+            '20.0');
 
-    return SettingsModel(
+    return SettingsModelComplete(
       apiKey: apiKey,
       secretKey: secretKey,
       isDemoMode: isDemoMode,
@@ -36,18 +61,8 @@ class SettingsRepository {
     );
   }
 
-  Future<void> updateSettings(SettingsModel settings) async {
-    await _secureStorage.saveApiKey(settings.apiKey);
-    await _secureStorage.saveSecretKey(settings.secretKey);
-    await _secureStorage.saveValue('isDemoMode', settings.isDemoMode.toString());
-    await _secureStorage.saveValue('isBacktestingEnabled', settings.isBacktestingEnabled.toString());
-    await _secureStorage.saveValue('maxLossPercentage', settings.maxLossPercentage.toString());
-    await _secureStorage.saveValue('maxConcurrentTrades', settings.maxConcurrentTrades.toString());
-    await _secureStorage.saveValue('maxPositionSizePercentage', settings.maxPositionSizePercentage.toString());
-    await _secureStorage.saveValue('dailyExposureLimit', settings.dailyExposureLimit.toString());
-    await _secureStorage.saveValue('maxAllowedVolatility', settings.maxAllowedVolatility.toString());
-    await _secureStorage.saveValue('maxRebuyCount', settings.maxRebuyCount.toString());
-    await _secureStorage.saveValue('maxVariableInvestmentPercentage', settings.maxVariableInvestmentPercentage.toString());
+  Future<void> updateAdvancedMode(bool isAdvancedMode) async {
+    await _secureStorage.saveValue('isAdvancedMode', isAdvancedMode.toString());
   }
 
   Future<void> updateApiKey(String apiKey) async {
@@ -67,26 +82,35 @@ class SettingsRepository {
         'isBacktestingEnabled', isBacktestingEnabled.toString());
   }
 
-  Future<void> updateRiskManagement({
-    required double maxLossPercentage,
-    required int maxConcurrentTrades,
-    required double maxPositionSizePercentage,
-    required double dailyExposureLimit,
-    required double maxAllowedVolatility,
-    required int maxRebuyCount,
-  }) async {
+  Future<void> updateRiskManagement(RiskManagementSettings settings) async {
     await _secureStorage.saveValue(
-        'maxLossPercentage', maxLossPercentage.toString());
+        'maxLossPercentage', settings.maxLossPercentage.toString());
     await _secureStorage.saveValue(
-        'maxConcurrentTrades', maxConcurrentTrades.toString());
+        'maxConcurrentTrades', settings.maxConcurrentTrades.toString());
+    await _secureStorage.saveValue('maxPositionSizePercentage',
+        settings.maxPositionSizePercentage.toString());
     await _secureStorage.saveValue(
-        'maxPositionSizePercentage', maxPositionSizePercentage.toString());
+        'dailyExposureLimit', settings.dailyExposureLimit.toString());
     await _secureStorage.saveValue(
-        'dailyExposureLimit', dailyExposureLimit.toString());
+        'maxAllowedVolatility', settings.maxAllowedVolatility.toString());
     await _secureStorage.saveValue(
-        'maxAllowedVolatility', maxAllowedVolatility.toString());
-    await _secureStorage.saveValue('maxRebuyCount', maxRebuyCount.toString());
+        'maxRebuyCount', settings.maxRebuyCount.toString());
+  }
+
+  Future<RiskManagementSettings> _getRiskManagementSettings() async {
+    return RiskManagementSettings(
+      maxLossPercentage: double.parse(
+          await _secureStorage.getValue('maxLossPercentage') ?? '2.0'),
+      maxConcurrentTrades: int.parse(
+          await _secureStorage.getValue('maxConcurrentTrades') ?? '3'),
+      maxPositionSizePercentage: double.parse(
+          await _secureStorage.getValue('maxPositionSizePercentage') ?? '5.0'),
+      dailyExposureLimit: double.parse(
+          await _secureStorage.getValue('dailyExposureLimit') ?? '1000.0'),
+      maxAllowedVolatility: double.parse(
+          await _secureStorage.getValue('maxAllowedVolatility') ?? '0.05'),
+      maxRebuyCount:
+          int.parse(await _secureStorage.getValue('maxRebuyCount') ?? '3'),
+    );
   }
 }
-
-

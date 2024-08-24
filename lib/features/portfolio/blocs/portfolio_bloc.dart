@@ -1,5 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cost_averaging_trading_app/core/error/error_handler.dart';
 import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_event.dart';
 import 'package:cost_averaging_trading_app/features/portfolio/blocs/portfolio_state.dart';
 import 'package:cost_averaging_trading_app/features/portfolio/repositories/portfolio_repository.dart';
@@ -21,15 +20,19 @@ class PortfolioBloc extends Bloc<PortfolioEvent, PortfolioState> {
       final performanceData = await _repository.getPerformanceData();
       final dailyChange = await _repository.getDailyChange();
       final weeklyChange = await _repository.getWeeklyChange();
-      emit(PortfolioLoaded(
-        portfolio: portfolio,
-        performanceData: performanceData,
-        dailyChange: dailyChange,
-        weeklyChange: weeklyChange,
-      ));
-    } catch (e, stackTrace) {
-      ErrorHandler.logError('Error loading portfolio data', e, stackTrace);
-      emit(PortfolioError(ErrorHandler.getUserFriendlyErrorMessage(e)));
+      
+      if (portfolio.totalValue == 0 && performanceData.isEmpty) {
+        emit(PortfolioEmpty());
+      } else {
+        emit(PortfolioLoaded(
+          portfolio: portfolio,
+          performanceData: performanceData,
+          dailyChange: dailyChange,
+          weeklyChange: weeklyChange,
+        ));
+      }
+    } catch (e) {
+      emit(PortfolioError("Si è verificato un errore imprevisto. Per favore, riprova più tardi."));
     }
   }
 }

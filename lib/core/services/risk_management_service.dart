@@ -54,7 +54,7 @@ class RiskManagementService {
 
   Future<bool> isStrategySafe(StrategyParameters parameters) async {
     try {
-      final settings = await settingsRepository.getSettings();
+      final settings = await settingsRepository.getSettingsComplete();
 
       // Check if the investment amount is within limits
       if (parameters.investmentAmount >
@@ -86,7 +86,7 @@ class RiskManagementService {
   Future<bool> _isWithinVolatilityLimits(CoreTrade trade) async {
     try {
       double volatility = await _calculateVolatility(trade.symbol);
-      final settings = await settingsRepository.getSettings();
+      final settings = await settingsRepository.getSettingsComplete();
 
       return volatility <= settings.maxAllowedVolatility;
     } catch (e, stackTrace) {
@@ -99,7 +99,7 @@ class RiskManagementService {
   Future<bool> _isWithinMaxRebuyLimit(CoreTrade trade) async {
     try {
       int rebuyCount = await _getRebuyCount(trade.symbol);
-      final settings = await settingsRepository.getSettings();
+      final settings = await settingsRepository.getSettingsComplete();
 
       return rebuyCount < settings.maxRebuyCount;
     } catch (e, stackTrace) {
@@ -110,7 +110,7 @@ class RiskManagementService {
 
   Future<bool> _isAboveStopLoss(
       CoreTrade trade, double currentPortfolioValue) async {
-    final settings = await settingsRepository.getSettings();
+    final settings = await settingsRepository.getSettingsComplete();
     double potentialLoss =
         (currentPortfolioValue - (trade.amount * trade.price)) /
             currentPortfolioValue;
@@ -121,7 +121,7 @@ class RiskManagementService {
       CoreTrade trade,
       double currentPortfolioValue,
       StrategyParameters strategyParameters) async {
-    final settings = await settingsRepository.getSettings();
+    final settings = await settingsRepository.getSettingsComplete();
     double tradeValue = trade.amount * trade.price;
 
     double maxPositionSize =
@@ -139,7 +139,7 @@ class RiskManagementService {
   Future<bool> _isWithinDailyExposureLimit(CoreTrade trade) async {
     try {
       double dailyExposure = await _calculateDailyExposure(trade.symbol);
-      final settings = await settingsRepository.getSettings();
+      final settings = await settingsRepository.getSettingsComplete();
       return dailyExposure + (trade.amount * trade.price) <=
           settings.dailyExposureLimit;
     } catch (e, stackTrace) {
@@ -194,7 +194,7 @@ class RiskManagementService {
       );
       return recentTrades.length;
     } catch (e, stackTrace) {
-      final settings = await settingsRepository.getSettings();
+      final settings = await settingsRepository.getSettingsComplete();
 
       ErrorHandler.logError('Error in _getRebuyCount', e, stackTrace);
       return settings.maxRebuyCount;
@@ -224,7 +224,7 @@ class RiskManagementService {
 
     return totalExposure;
   } catch (e, stackTrace) {
-    final settings = await settingsRepository.getSettings();
+    final settings = await settingsRepository.getSettingsComplete();
     ErrorHandler.logError('Error in _calculateDailyExposure', e, stackTrace);
     return settings.dailyExposureLimit;
   }
@@ -338,7 +338,7 @@ class RiskManagementService {
   }
 
   Future<RiskManagementSettings> getRiskManagementSettings() async {
-    final settings = await settingsRepository.getSettings();
+    final settings = await settingsRepository.getSettingsComplete();
     return RiskManagementSettings(
       maxLossPercentage: settings.maxLossPercentage,
       maxConcurrentTrades: settings.maxConcurrentTrades,

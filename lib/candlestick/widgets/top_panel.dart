@@ -14,14 +14,14 @@ class TopPanel extends StatefulWidget {
   final void Function(String indicatorName)? onRemoveIndicator;
   final CandleSticksStyle style;
   const TopPanel({
-    Key? key,
+    super.key,
     required this.currentCandle,
     required this.indicators,
     required this.toggleIndicatorVisibility,
     required this.unvisibleIndicators,
     required this.onRemoveIndicator,
     required this.style,
-  }) : super(key: key);
+  });
 
   @override
   State<TopPanel> createState() => _TopPanelState();
@@ -32,10 +32,9 @@ class _PanelButton extends StatelessWidget {
 
   final Color borderColor;
   const _PanelButton({
-    Key? key,
     required this.child,
     required this.borderColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

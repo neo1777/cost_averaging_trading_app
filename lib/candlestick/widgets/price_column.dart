@@ -15,7 +15,7 @@ class PriceColumn extends StatefulWidget {
   final void Function(double) onScale;
   final CandleSticksStyle style;
   const PriceColumn({
-    Key? key,
+    super.key,
     required this.low,
     required this.high,
     required this.width,
@@ -23,7 +23,7 @@ class PriceColumn extends StatefulWidget {
     required this.lastCandle,
     required this.onScale,
     required this.style,
-  }) : super(key: key);
+  });
 
   @override
   State<PriceColumn> createState() => _PriceColumnState();
